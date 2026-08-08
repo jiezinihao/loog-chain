@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "个人前端项目展示的 pnpm monorepo。",
-  "packageManager": "pnpm@10.34.4",
+  "packageManager": "pnpm@11.5.2",
   "engines": {
     "node": ">=22.0.0",
     "pnpm": ">=10.0.0"

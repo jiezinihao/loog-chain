@@ -2,11 +2,12 @@ packages:
   - apps/*
   - packages/*
 
-# 显式允许 Vite 所需的 esbuild 安装脚本，避免接受其他未声明脚本。
-onlyBuiltDependencies:
-  - esbuild
+# 显式允许 Vite 所需的 esbuild 安装脚本，其他未列出的依赖仍不执行脚本。
+allowBuilds:
+  esbuild: true
 
 catalog:
+  "@types/node": ^24.0.0
   "@vitejs/plugin-vue": ^6.0.1
   typescript: ^5.9.2
   vite: ^7.1.7
