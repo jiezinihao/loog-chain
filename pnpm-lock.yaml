@@ -113,7 +113,11 @@ importers:
 
   packages/hand-coded-blog: {}
 
-  packages/thinking: {}
+  packages/thinking:
+    dependencies:
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.41(typescript@5.9.3)
 
 packages:
 
