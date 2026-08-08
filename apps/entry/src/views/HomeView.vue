@@ -39,7 +39,7 @@ function enterModule(event: MouseEvent, module: PortalModule) {
   selectModule(module.id);
   isEntering.value = true;
   enterTimer = window.setTimeout(() => {
-    router.push(module.path);
+    void router.push(module.path);
   }, 420);
 }
 

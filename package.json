@@ -11,6 +11,17 @@
   "scripts": {
     "dev": "pnpm --filter @think-chain/entry dev",
     "build": "pnpm --filter @think-chain/entry build",
-    "typecheck": "pnpm --filter @think-chain/entry typecheck"
+    "typecheck": "pnpm --filter @think-chain/entry typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-vue": "catalog:",
+    "globals": "catalog:",
+    "prettier": "catalog:",
+    "typescript-eslint": "catalog:"
   }
 }
