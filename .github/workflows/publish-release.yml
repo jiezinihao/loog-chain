@@ -1,0 +1,107 @@
+name: publish-release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 首次补发或重新触发时使用的版本号，例如 0.1.0-base
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: 解析并校验版本
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          TARGET_SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="$INPUT_VERSION"
+          else
+            version="${RELEASE_BRANCH#release/}"
+          fi
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::版本号 $version 不符合 SemVer 格式"
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: 检出已发布代码
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.target_sha }}
+          persist-credentials: false
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 发布前执行 ESLint
+        run: pnpm lint
+
+      - name: 构建发布产物
+        run: pnpm build
+
+      - name: 打包发布产物
+        id: artifact
+        shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          archive="think-chain-$VERSION.zip"
+          cd apps/entry/dist
+          zip -r "$GITHUB_WORKSPACE/$archive" .
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: 创建 GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+          ARCHIVE: ${{ steps.artifact.outputs.archive }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::GitHub Release $TAG 已存在，请使用新的版本号"
+            exit 1
+          fi
+
+          gh release create "$TAG" "$ARCHIVE" \
+            --target "$TARGET_SHA" \
+            --title "$TAG" \
+            --generate-notes
