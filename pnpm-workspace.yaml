@@ -2,13 +2,21 @@ packages:
   - apps/*
   - packages/*
 
-# 显式允许 Vite 所需的 esbuild 安装脚本，避免接受其他未声明脚本。
-onlyBuiltDependencies:
-  - esbuild
+# 显式允许 Vite 所需的 esbuild 安装脚本，其他未列出的依赖仍不执行脚本。
+allowBuilds:
+  esbuild: true
 
 catalog:
+  "@eslint/js": 10.0.1
+  "@types/node": ^24.0.0
   "@vitejs/plugin-vue": ^6.0.1
+  eslint: 10.8.1
+  eslint-config-prettier: 10.1.8
+  eslint-plugin-vue: 10.10.0
+  globals: 17.9.0
+  prettier: 3.9.6
   typescript: ^5.9.2
+  typescript-eslint: 8.66.0
   vite: ^7.1.7
   vue: ^3.5.21
   vue-router: ^4.5.1
