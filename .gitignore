@@ -7,6 +7,7 @@ dist/
 .env.*
 !.env.example
 *.log
+__pycache__/
 
 # IDE 与系统临时文件
 .DS_Store
