@@ -1,0 +1,62 @@
+name: start-next-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 下一版本号，例如 0.1.1、0.2.0 或 1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: start-next-release
+  cancel-in-progress: false
+
+jobs:
+  create:
+    name: create
+    runs-on: ubuntu-latest
+    steps:
+      - name: 确认从 main 创建版本分支
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ github.ref_name }}
+        run: |
+          if [[ "$SOURCE_BRANCH" != "main" ]]; then
+            echo "::error::请在 Actions 页面选择 main 分支运行此工作流"
+            exit 1
+          fi
+
+      - name: 校验下一版本号
+        id: release
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::版本号 $VERSION 不符合 SemVer 格式"
+            exit 1
+          fi
+
+          echo "branch=release/$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 检出最新 main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: 创建下一版本分支
+        shell: bash
+        env:
+          NEXT_BRANCH: ${{ steps.release.outputs.branch }}
+        run: |
+          if git ls-remote --exit-code --heads origin "refs/heads/$NEXT_BRANCH" >/dev/null 2>&1; then
+            echo "::error::远程分支 $NEXT_BRANCH 已存在"
+            exit 1
+          fi
+
+          git push origin "HEAD:refs/heads/$NEXT_BRANCH"
+          echo "已从 main 创建 $NEXT_BRANCH"
