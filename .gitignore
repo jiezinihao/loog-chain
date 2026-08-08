@@ -1,0 +1,15 @@
+# pnpm 与构建产物
+node_modules/
+dist/
+
+# 本地环境配置与运行日志
+.env
+.env.*
+!.env.example
+*.log
+
+# IDE 与系统临时文件
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+# 显式允许 Vite 所需的 esbuild 安装脚本，避免接受其他未声明脚本。
+onlyBuiltDependencies:
+  - esbuild
+
+catalog:
+  "@vitejs/plugin-vue": ^6.0.1
+  typescript: ^5.9.2
+  vite: ^7.1.7
+  vue: ^3.5.21
+  vue-router: ^4.5.1
+  vue-tsc: ^3.0.8
