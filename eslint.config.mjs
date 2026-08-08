@@ -4,7 +4,7 @@ import vue from 'eslint-plugin-vue';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const browserTypedFiles = ['apps/**/*.{ts,tsx,vue}', 'packages/**/*.ts'];
+const browserTypedFiles = ['apps/**/*.{ts,tsx,vue}', 'packages/**/*.{ts,tsx,vue}'];
 const viteConfigFiles = ['apps/entry/vite.config.ts'];
 const typedParserOptions = {
   project: './tsconfig.eslint.json',
@@ -95,7 +95,7 @@ export default tseslint.config(
   ...elevateRules(vue.configs['flat/recommended']),
   {
     name: 'think-chain/vue-typescript',
-    files: ['apps/**/*.vue'],
+    files: ['apps/**/*.vue', 'packages/**/*.vue'],
     languageOptions: {
       globals: globals.browser,
       parserOptions: {

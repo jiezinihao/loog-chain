@@ -6,12 +6,18 @@ import { portalModules } from './portal-modules';
 import HomeView from './views/HomeView.vue';
 import PlaceholderView from './views/PlaceholderView.vue';
 
-// 三个模块共享唯一入口；实际业务页确定前先统一落到占位路由。
+const placeholderModules = portalModules.filter((module) => module.id !== 'thinking');
+
+// 思想切面按路由异步加载，避免入口首屏提前打包笔记正文和页面动效。
+const loadThinkingView = () => import('@think-chain/thinking').then((module) => module.ThinkingView);
+
+// 三个模块共享唯一入口；已具备真实页面的模块单独接入，其余继续使用统一占位页。
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: HomeView },
-    ...portalModules.map((module) => ({
+    { path: '/thinking', component: loadThinkingView },
+    ...placeholderModules.map((module) => ({
       path: module.path,
       component: PlaceholderView,
       props: { module },
