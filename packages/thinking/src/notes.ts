@@ -35,6 +35,7 @@ const NOTE_PRESENTATION: Record<string, NotePresentation> = {
   'WebGIS地图业务基础.md': { category: 'MAP / WEBGIS', weight: 2, accent: '97 196 138', rank: 5 },
   'Git复杂协作场景与命令.md': { category: 'GIT / WORKFLOW', weight: 1, accent: '240 167 83', rank: 6 },
   '通过github实现项目的ci-cd.md': { category: 'GIT / DELIVERY', weight: 1, accent: '232 117 92', rank: 7 },
+  'VPN TUN模式下访问本地内网.md': { category: 'NETWORK / VPN', weight: 1, accent: '82 174 255', rank: 8 },
 };
 
 const DEFAULT_PRESENTATION: NotePresentation = {
