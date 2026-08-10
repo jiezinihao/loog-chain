@@ -2,4 +2,5 @@
 export const thinkingModule = 'thinking';
 
 export { default as ThinkingView } from './ThinkingView.vue';
+export { default as ThinkingDetailView } from './ThinkingDetailView.vue';
 export { thinkingNotes, type ThinkingNote, type NoteWeight } from './notes';
