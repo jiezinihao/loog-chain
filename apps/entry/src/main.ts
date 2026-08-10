@@ -10,13 +10,16 @@ const placeholderModules = portalModules.filter((module) => module.id !== 'think
 
 // 思想切面按路由异步加载，避免入口首屏提前打包笔记正文和页面动效。
 const loadThinkingView = () => import('@think-chain/thinking').then((module) => module.ThinkingView);
+const loadThinkingDetailView = () =>
+  import('@think-chain/thinking').then((module) => module.ThinkingDetailView);
 
 // 三个模块共享唯一入口；已具备真实页面的模块单独接入，其余继续使用统一占位页。
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: HomeView },
-    { path: '/thinking', component: loadThinkingView },
+    { path: '/thinking', name: 'thinking', component: loadThinkingView },
+    { path: '/thinking/:id', name: 'thinking-detail', component: loadThinkingDetailView },
     ...placeholderModules.map((module) => ({
       path: module.path,
       component: PlaceholderView,

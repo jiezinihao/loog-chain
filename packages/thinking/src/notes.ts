@@ -10,6 +10,7 @@ export interface ThinkingNote {
   id: string;
   title: string;
   fileName: string;
+  content: string;
   category: string;
   excerpt: string;
   weight: NoteWeight;
@@ -87,6 +88,7 @@ export const thinkingNotes: ThinkingNote[] = Object.entries(noteFiles)
       id: createId(fileName),
       title: getTitle(content, fileName),
       fileName,
+      content,
       category: presentation.category,
       excerpt: getExcerpt(content),
       weight: presentation.weight,

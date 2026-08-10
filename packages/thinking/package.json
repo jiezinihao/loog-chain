@@ -7,6 +7,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "vue": "catalog:"
+    "dompurify": "catalog:",
+    "marked": "catalog:",
+    "vue": "catalog:",
+    "vue-router": "catalog:"
   }
 }
