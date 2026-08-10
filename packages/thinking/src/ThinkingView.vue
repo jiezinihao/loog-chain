@@ -224,17 +224,15 @@ onBeforeUnmount(() => {
               :style="getTileStyle(note)"
               :aria-hidden="note.cycle > 0 ? 'true' : undefined"
             >
-              <button
+              <RouterLink
                 class="flow-tile"
-                type="button"
+                :to="{ name: 'thinking-detail', params: { id: note.id } }"
                 :aria-label="`查看笔记信息：${note.title}`"
-                :aria-pressed="visibleIndex === index"
                 :tabindex="note.cycle > 0 ? -1 : 0"
                 @pointerenter="setActiveNote(index, $event)"
                 @pointerleave="clearActiveNote"
                 @focus="setActiveNote(index, $event)"
                 @blur="clearActiveNote"
-                @click="setActiveNote(index, $event)"
               >
                 <span class="flow-tile__surface" aria-hidden="true"></span>
                 <span class="flow-tile__content">
@@ -247,7 +245,7 @@ onBeforeUnmount(() => {
                     <i v-for="level in 3" :key="level" :class="{ 'is-filled': level <= note.weight }"></i>
                   </span>
                 </span>
-              </button>
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -629,6 +627,7 @@ html[data-theme='light'] [data-thinking-theme-root] {
   background: transparent;
   color: var(--color-foreground);
   cursor: pointer;
+  text-decoration: none;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
