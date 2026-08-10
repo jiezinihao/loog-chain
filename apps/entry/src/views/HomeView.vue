@@ -110,20 +110,44 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-:global(html) {
-  color-scheme: dark;
-}
-
 :global(body) {
-  background: #07080b;
-  color: #f8fafc;
+  background: var(--app-background);
+  color: var(--app-foreground);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* 入口页在组件级维护两套色板，主题切换不改变内容层整体亮度。 */
 .entry-shell {
+  --entry-background: #07080b;
+  --entry-foreground: #f8fafc;
+  --entry-muted: #b9bec8;
+  --entry-subtle: #a8adb7;
+  --entry-border: rgb(255 255 255 / 16%);
+  --entry-focus: #fff;
+  --entry-card-scrim: linear-gradient(180deg, rgb(3 4 9 / 8%) 12%, rgb(3 4 9 / 8%) 42%, rgb(3 4 9 / 82%) 100%);
+  --entry-loader-label: #e4e7ec;
+  --entry-loader-accent: #69f9dc;
+  --entry-gear-border: rgb(255 255 255 / 52%);
+  --entry-gear-inner-border: rgb(255 255 255 / 42%);
   min-height: 100dvh;
   overflow: hidden;
-  background: #07080b;
+  background: var(--entry-background);
+  color: var(--entry-foreground);
+  transition: background-color 220ms ease, color 220ms ease;
+}
+
+:global(html[data-theme='light']) .entry-shell {
+  --entry-background: #f5f2ed;
+  --entry-foreground: #202126;
+  --entry-muted: #4f535c;
+  --entry-subtle: #62666f;
+  --entry-border: rgb(32 33 38 / 20%);
+  --entry-focus: #382469;
+  --entry-card-scrim: linear-gradient(180deg, rgb(255 255 255 / 8%) 12%, rgb(255 255 255 / 18%) 42%, rgb(255 255 255 / 88%) 100%);
+  --entry-loader-label: #363941;
+  --entry-loader-accent: #087d69;
+  --entry-gear-border: rgb(32 33 38 / 34%);
+  --entry-gear-inner-border: rgb(32 33 38 / 28%);
 }
 
 .skip-link {
@@ -132,8 +156,8 @@ onBeforeUnmount(() => {
   top: 1rem;
   left: 1rem;
   padding: .7rem .85rem;
-  background: #fff;
-  color: #08090d;
+  background: var(--entry-foreground);
+  color: var(--entry-background);
   font-size: .78rem;
   font-weight: 700;
   text-decoration: none;
@@ -166,7 +190,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   padding: max(clamp(2rem, 4vw, 4.75rem), env(safe-area-inset-top)) max(clamp(2rem, 4vw, 4.75rem), env(safe-area-inset-right)) max(clamp(2rem, 4vw, 4.75rem), env(safe-area-inset-bottom)) max(clamp(2rem, 4vw, 4.75rem), env(safe-area-inset-left));
   border: 0;
-  border-right: 1px solid rgb(255 255 255 / 16%);
+  border-right: 1px solid var(--entry-border);
   color: inherit;
   cursor: pointer;
   touch-action: manipulation;
@@ -174,7 +198,7 @@ onBeforeUnmount(() => {
   isolation: isolate;
   text-align: left;
   text-decoration: none;
-  transition: flex-basis 520ms cubic-bezier(.16, 1, .3, 1), filter 420ms ease, transform 520ms cubic-bezier(.16, 1, .3, 1);
+  transition: background-color 220ms ease, flex-basis 520ms cubic-bezier(.16, 1, .3, 1), transform 520ms cubic-bezier(.16, 1, .3, 1);
 }
 
 .portal-card:last-child {
@@ -192,7 +216,7 @@ onBeforeUnmount(() => {
 
 .portal-card::after {
   z-index: -1;
-  background: linear-gradient(180deg, rgb(3 4 9 / 8%) 12%, rgb(3 4 9 / 8%) 42%, rgb(3 4 9 / 82%) 100%);
+  background: var(--entry-card-scrim);
 }
 
 .portal-card--hand-coded-blog {
@@ -231,6 +255,41 @@ onBeforeUnmount(() => {
     linear-gradient(150deg, #381526 0%, #1c0e1c 58%, #08080c 100%);
 }
 
+:global(html[data-theme='light']) .portal-card--hand-coded-blog {
+  background: #f1dfcf;
+}
+
+:global(html[data-theme='light']) .portal-card--hand-coded-blog::before {
+  background:
+    linear-gradient(128deg, transparent 45%, rgb(161 85 34 / 18%) 46%, transparent 47%) 0 0 / 28px 28px,
+    radial-gradient(circle at 18% 21%, #9d5327 0 1px, transparent 2px) 0 0 / 31px 31px,
+    radial-gradient(circle at 70% 31%, rgb(220 128 59 / 35%), transparent 31%),
+    linear-gradient(145deg, #f8eadf 0%, #ead6c5 58%, #d8c2b2 100%);
+}
+
+:global(html[data-theme='light']) .portal-card--ai-3d {
+  background: #e5e8f7;
+}
+
+:global(html[data-theme='light']) .portal-card--ai-3d::before {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgb(139 73 189 / 55%) 0 3%, rgb(48 145 165 / 34%) 22%, transparent 45%),
+    conic-gradient(from 210deg at 52% 43%, transparent 0 14%, rgb(38 142 166 / 24%) 18%, transparent 24% 38%, rgb(127 73 184 / 28%) 46%, transparent 53% 72%, rgb(38 153 128 / 22%) 80%, transparent 88%),
+    linear-gradient(165deg, #f0ebfb 0%, #dce7f2 55%, #eef1f7 100%);
+}
+
+:global(html[data-theme='light']) .portal-card--thinking {
+  background: #f0dce7;
+}
+
+:global(html[data-theme='light']) .portal-card--thinking::before {
+  background:
+    radial-gradient(ellipse at 84% 16%, rgb(197 72 132 / 24%), transparent 36%),
+    radial-gradient(ellipse at 35% 65%, rgb(197 55 105 / 25%), transparent 42%),
+    repeating-radial-gradient(ellipse at 58% 56%, transparent 0 24px, rgb(151 52 99 / 12%) 25px 26px, transparent 27px 45px),
+    linear-gradient(150deg, #f8eaf1 0%, #ead3df 58%, #dcc6d2 100%);
+}
+
 .portal-card__noise {
   position: absolute;
   z-index: -1;
@@ -244,7 +303,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: clamp(1.6rem, 3vw, 3rem);
   right: clamp(1.6rem, 3vw, 3rem);
-  color: rgb(255 255 255 / 72%);
+  color: var(--entry-muted);
   font-size: .75rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: .16em;
@@ -266,7 +325,7 @@ onBeforeUnmount(() => {
 }
 
 .portal-card__eyebrow {
-  color: rgb(255 255 255 / 66%);
+  color: var(--entry-subtle);
   font-size: .67rem;
   font-weight: 650;
   letter-spacing: .18em;
@@ -284,7 +343,7 @@ onBeforeUnmount(() => {
 .portal-card__description {
   max-width: 19rem;
   margin-top: 1.15rem;
-  color: rgb(255 255 255 / 72%);
+  color: var(--entry-muted);
   font-size: .92rem;
   letter-spacing: .02em;
   line-height: 1.7;
@@ -295,7 +354,7 @@ onBeforeUnmount(() => {
 
 .portal-card__action {
   margin-top: 1.5rem;
-  color: #fff;
+  color: var(--entry-foreground);
   font-size: .72rem;
   font-weight: 700;
   letter-spacing: .14em;
@@ -311,7 +370,7 @@ onBeforeUnmount(() => {
 }
 
 .portal-card:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--entry-focus);
   outline-offset: -6px;
 }
 
@@ -353,12 +412,7 @@ onBeforeUnmount(() => {
 }
 
 .portal--focused .portal-card:not(.portal-card--selected) {
-  filter: saturate(.46) brightness(.62);
   transform: scale(.985);
-}
-
-.portal-card--selected {
-  filter: saturate(1.2) brightness(1.05);
 }
 
 .entry-shell--entering .portal-card:not(.portal-card--selected) {
@@ -380,7 +434,7 @@ onBeforeUnmount(() => {
   min-height: 100dvh;
   place-items: center;
   overflow: hidden;
-  background: #07080b;
+  background: var(--entry-background);
   opacity: 1;
   transition: opacity 560ms ease, visibility 0s linear 560ms;
 }
@@ -405,7 +459,7 @@ onBeforeUnmount(() => {
 .gear {
   position: absolute;
   display: grid;
-  border: 1px solid rgb(255 255 255 / 52%);
+  border: 1px solid var(--entry-gear-border);
   border-radius: 50%;
   place-items: center;
   background: conic-gradient(from 90deg, #ff8d5c, #6a8dff, #5cffe1, #ff94c3, #ff8d5c);
@@ -436,9 +490,9 @@ onBeforeUnmount(() => {
   display: block;
   width: 60%;
   aspect-ratio: 1;
-  border: 1px solid rgb(255 255 255 / 42%);
+  border: 1px solid var(--entry-gear-inner-border);
   border-radius: 50%;
-  background: #07080b;
+  background: var(--entry-background);
   box-shadow: inset 0 0 20px rgb(0 0 0 / 60%);
 }
 
@@ -456,7 +510,7 @@ onBeforeUnmount(() => {
   position: absolute;
   bottom: clamp(2rem, 5vw, 4rem);
   margin: 0;
-  color: rgb(255 255 255 / 86%);
+  color: var(--entry-loader-label);
   font-size: .67rem;
   font-weight: 700;
   letter-spacing: .3em;
@@ -465,7 +519,7 @@ onBeforeUnmount(() => {
 .loader__label span {
   display: inline-block;
   margin-left: .8em;
-  color: #69f9dc;
+  color: var(--entry-loader-accent);
   animation: pulse 1s ease-in-out infinite alternate;
 }
 
@@ -497,7 +551,7 @@ onBeforeUnmount(() => {
     min-height: 33.33dvh;
     padding: 2rem;
     border-right: 0;
-    border-bottom: 1px solid rgb(255 255 255 / 16%);
+    border-bottom: 1px solid var(--entry-border);
   }
 
   .portal-card:last-child {
@@ -511,6 +565,16 @@ onBeforeUnmount(() => {
   .portal-card__description,
   .portal-card__action {
     display: none;
+  }
+
+  .portal-card:first-child .portal-card__index {
+    right: var(--theme-control-clearance);
+  }
+}
+
+@media (min-width: 761px) {
+  .portal-card:last-child .portal-card__index {
+    right: max(var(--theme-control-clearance), calc(env(safe-area-inset-right) + var(--theme-control-clearance)));
   }
 }
 
@@ -526,6 +590,10 @@ onBeforeUnmount(() => {
 
   .portal {
     transform: none;
+  }
+
+  .entry-shell {
+    transition: none;
   }
 }
 </style>
