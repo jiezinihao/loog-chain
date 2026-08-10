@@ -166,12 +166,15 @@ onBeforeUnmount(() => {
         <span v-else class="thinking-detail__toc-empty">本篇暂无目录</span>
       </aside>
 
+      <!-- 正文 HTML 已在 renderMarkdown 中经过 DOMPurify 净化，仅在此处按只读内容渲染。 -->
+      <!-- eslint-disable vue/no-v-html -->
       <article
         id="thinking-article"
         class="thinking-detail__article"
         @click="handleArticleClick"
         v-html="renderedNote.html"
       ></article>
+      <!-- eslint-enable vue/no-v-html -->
     </div>
 
     <nav class="thinking-detail__pagination" aria-label="相邻笔记">
