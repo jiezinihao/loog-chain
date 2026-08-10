@@ -25,33 +25,60 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 占位页通过语义变量分别适配 Light / Dark，保持两种模式的层级与对比度。 */
 .placeholder {
+  --placeholder-background: #08090d;
+  --placeholder-foreground: #f8fafc;
+  --placeholder-muted: #b5bbc5;
+  --placeholder-link: #d5d9df;
+  --placeholder-focus: #fff;
   display: grid;
   min-height: 100dvh;
   padding: clamp(2rem, 5vw, 5rem);
   place-items: center;
-  background: radial-gradient(circle at 50% 42%, var(--glow), transparent 30%), #08090d;
-  color: #f8fafc;
+  background: radial-gradient(circle at 50% 42%, var(--glow), transparent 30%), var(--placeholder-background);
+  color: var(--placeholder-foreground);
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  transition: background-color 220ms ease, color 220ms ease;
 }
 
 .placeholder--hand-coded-blog { --glow: rgb(255 160 84 / 30%); }
 .placeholder--ai-3d { --glow: rgb(103 101 255 / 34%); }
 .placeholder--thinking { --glow: rgb(244 83 151 / 28%); }
 
+:global(html[data-theme='light']) .placeholder {
+  --placeholder-background: #f5f2ed;
+  --placeholder-foreground: #202126;
+  --placeholder-muted: #565a63;
+  --placeholder-link: #3f434b;
+  --placeholder-focus: #5940a5;
+}
+
+:global(html[data-theme='light']) .placeholder--hand-coded-blog { --glow: rgb(207 102 37 / 20%); }
+:global(html[data-theme='light']) .placeholder--ai-3d { --glow: rgb(91 75 190 / 20%); }
+:global(html[data-theme='light']) .placeholder--thinking { --glow: rgb(190 54 112 / 18%); }
+
 .placeholder__back {
   position: absolute;
-  top: clamp(2rem, 5vw, 5rem);
-  left: clamp(2rem, 5vw, 5rem);
-  color: rgb(255 255 255 / 72%);
+  top: max(clamp(2rem, 5vw, 5rem), env(safe-area-inset-top));
+  left: max(clamp(2rem, 5vw, 5rem), env(safe-area-inset-left));
+  min-height: 44px;
+  color: var(--placeholder-link);
   font-size: .8rem;
   letter-spacing: .08em;
+  line-height: 44px;
   text-decoration: none;
+  transition: color 180ms ease;
 }
 
 .placeholder__back:hover,
 .placeholder__back:focus-visible {
-  color: #fff;
+  color: var(--placeholder-foreground);
+}
+
+.placeholder__back:focus-visible {
+  outline: 2px solid var(--placeholder-focus);
+  outline-offset: 4px;
 }
 
 .placeholder__content {
@@ -60,7 +87,7 @@ onMounted(() => {
 
 .placeholder__content p,
 .placeholder__content span {
-  color: rgb(255 255 255 / 58%);
+  color: var(--placeholder-muted);
   font-size: .7rem;
   letter-spacing: .2em;
 }
@@ -73,6 +100,13 @@ onMounted(() => {
 }
 
 .placeholder__content span {
-  color: rgb(255 255 255 / 76%);
+  color: var(--placeholder-link);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placeholder,
+  .placeholder__back {
+    transition: none;
+  }
 }
 </style>

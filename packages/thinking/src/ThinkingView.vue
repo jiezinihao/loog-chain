@@ -173,6 +173,7 @@ onBeforeUnmount(() => {
     class="thinking-page"
     :class="{ 'thinking-page--ready': isReady }"
     :style="pageStyle"
+    data-thinking-theme-root
     tabindex="-1"
   >
     <section ref="pageElement" class="thinking-scroll" :style="sceneStyle" aria-labelledby="thinking-title">
@@ -259,6 +260,41 @@ onBeforeUnmount(() => {
   </main>
 </template>
 
+<style>
+/* 跨越异步路由包的 scoped 边界，确保根主题变化能覆盖 Thinking 页语义色。 */
+html[data-theme='light'] [data-thinking-theme-root] {
+  --color-background: #f3f0ec;
+  --color-surface: #fff;
+  --color-foreground: #202126;
+  --color-muted: #55565e;
+  --color-border: rgb(32 33 38 / 20%);
+  --color-focus: #5b3bb6;
+  --color-eyebrow: #a51f51;
+  --color-category: #982047;
+  --color-excerpt: #44454c;
+  --color-axis: rgb(32 33 38 / 14%);
+  --color-inspector: rgb(255 255 255 / 58%);
+  --color-tile-border: rgb(32 33 38 / 20%);
+  --color-tile-start: rgb(255 255 255 / 98%);
+  --color-tile-middle: rgb(238 234 237 / 99%);
+  --color-tile-end: rgb(226 220 225 / 100%);
+  --color-tile-active-start: rgb(255 255 255 / 100%);
+  --color-tile-active-middle: rgb(243 235 240 / 100%);
+  --color-tile-active-end: rgb(229 219 226 / 100%);
+  --color-tile-highlight: rgb(255 255 255 / 88%);
+  --color-tile-shadow: rgb(62 48 57 / 15%);
+  --color-tile-decoration: rgb(69 54 64 / 7%);
+  --color-tile-topline: #56535a;
+  --color-weight-empty: rgb(32 33 38 / 20%);
+  --color-footer: #625e63;
+  --color-reveal: #f0ece8;
+  --color-reveal-glow: rgb(177 47 101 / 13%);
+  --color-mobile-inspector: rgb(251 249 247 / 92%);
+  --scene-top: rgb(255 255 255 / 46%);
+  --scene-glow: rgb(181 78 121 / 13%);
+}
+</style>
+
 <style scoped>
 :global(*) {
   box-sizing: border-box;
@@ -272,28 +308,49 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-:global(html) {
-  color-scheme: dark;
-  background: #08090c;
-}
-
 :global(body) {
   overflow-x: hidden;
-  background: #08090c;
-  color: #f6f1eb;
+  background: var(--app-background);
+  color: var(--app-foreground);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* 思考页为 Light / Dark 映射独立表面色与文字色，不使用全局亮度滤镜。 */
 .thinking-page {
   --color-background: #08090c;
   --color-surface: #19191c;
   --color-foreground: #f6f1eb;
-  --color-muted: rgb(246 241 235 / 62%);
+  --color-muted: #aaa6a4;
   --color-border: rgb(255 255 255 / 14%);
+  --color-focus: #fff;
+  --color-eyebrow: #f58daa;
+  --color-category: #f58daa;
+  --color-excerpt: #d0ccca;
+  --color-axis: rgb(255 255 255 / 12%);
+  --color-inspector: rgb(8 9 12 / 48%);
+  --color-tile-border: rgb(255 255 255 / 16%);
+  --color-tile-start: rgb(48 46 50 / 98%);
+  --color-tile-middle: rgb(26 26 29 / 99%);
+  --color-tile-end: rgb(16 16 18 / 100%);
+  --color-tile-active-start: rgb(57 53 58 / 99%);
+  --color-tile-active-middle: rgb(29 28 32 / 99%);
+  --color-tile-active-end: rgb(16 16 18 / 100%);
+  --color-tile-highlight: rgb(255 255 255 / 10%);
+  --color-tile-shadow: rgb(0 0 0 / 28%);
+  --color-tile-decoration: rgb(255 255 255 / 6%);
+  --color-tile-topline: #a5a19f;
+  --color-weight-empty: rgb(255 255 255 / 14%);
+  --color-footer: #777371;
+  --color-reveal: #050609;
+  --color-reveal-glow: rgb(244 118 152 / 12%);
+  --color-mobile-inspector: rgb(8 9 12 / 88%);
+  --scene-top: rgb(17 15 20 / 42%);
+  --scene-glow: rgb(87 54 67 / 18%);
   position: relative;
   height: calc(100dvh + var(--page-length));
   background: var(--color-background);
   outline: none;
+  transition: background-color 220ms ease, color 220ms ease;
 }
 
 .thinking-scroll {
@@ -309,10 +366,11 @@ onBeforeUnmount(() => {
   height: 100dvh;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgb(17 15 20 / 42%), transparent 28%),
-    radial-gradient(circle at 48% 54%, rgb(87 54 67 / 18%), transparent 52%),
+    linear-gradient(180deg, var(--scene-top), transparent 28%),
+    radial-gradient(circle at 48% 54%, var(--scene-glow), transparent 52%),
     var(--color-background);
   isolation: isolate;
+  transition: background-color 220ms ease;
 }
 
 .thinking-scene__grain,
@@ -350,7 +408,7 @@ onBeforeUnmount(() => {
   height: 1px;
   top: 52%;
   left: -20vw;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 12%), transparent);
+  background: linear-gradient(90deg, transparent, var(--color-axis), transparent);
   transform: rotate(var(--flow-angle));
 }
 
@@ -386,13 +444,13 @@ onBeforeUnmount(() => {
 
 .thinking-header__back:focus-visible,
 .flow-tile:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--color-focus);
   outline-offset: 5px;
 }
 
 .thinking-header__eyebrow {
   margin: clamp(1.25rem, 3vh, 2.5rem) 0 0;
-  color: rgb(244 118 152 / 88%);
+  color: var(--color-eyebrow);
   font-size: .66rem;
   font-weight: 700;
   letter-spacing: .22em;
@@ -425,7 +483,7 @@ onBeforeUnmount(() => {
   width: min(24rem, 30vw);
   padding-left: 1.25rem;
   border-left: 1px solid rgb(var(--active-accent) / 68%);
-  background: linear-gradient(90deg, rgb(8 9 12 / 48%), transparent);
+  background: linear-gradient(90deg, var(--color-inspector), transparent);
 }
 
 .note-inspector__index,
@@ -455,7 +513,7 @@ onBeforeUnmount(() => {
 
 .note-inspector__category {
   margin-top: .55rem;
-  color: rgb(var(--active-accent) / 94%);
+  color: var(--color-category);
 }
 
 .note-inspector h2 {
@@ -469,7 +527,7 @@ onBeforeUnmount(() => {
   display: -webkit-box;
   overflow: hidden;
   margin-top: .7rem;
-  color: rgb(246 241 235 / 76%);
+  color: var(--color-excerpt);
   font-size: .78rem;
   line-height: 1.65;
   -webkit-box-orient: vertical;
@@ -487,7 +545,7 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 20;
   display: flex;
-  right: max(clamp(1.5rem, 4vw, 4.5rem), env(safe-area-inset-right));
+  right: max(var(--theme-control-clearance), calc(env(safe-area-inset-right) + var(--theme-control-clearance)));
   top: max(2rem, env(safe-area-inset-top));
   align-items: center;
 }
@@ -558,7 +616,6 @@ onBeforeUnmount(() => {
 
 .flow-tile-wrap--active {
   z-index: 4;
-  filter: brightness(1.14);
 }
 
 .flow-tile {
@@ -592,11 +649,11 @@ onBeforeUnmount(() => {
 .flow-tile__surface {
   position: absolute;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 16%);
+  border: 1px solid var(--color-tile-border);
   background:
     radial-gradient(circle at 18% 22%, rgb(var(--accent) / 16%), transparent 34%),
-    linear-gradient(135deg, rgb(48 46 50 / 98%), rgb(26 26 29 / 99%) 55%, rgb(16 16 18 / 100%));
-  box-shadow: inset 0 1px rgb(255 255 255 / 10%), 0 12px 28px rgb(0 0 0 / 28%);
+    linear-gradient(135deg, var(--color-tile-start), var(--color-tile-middle) 55%, var(--color-tile-end));
+  box-shadow: inset 0 1px var(--color-tile-highlight), 0 12px 28px var(--color-tile-shadow);
   inset: 0;
   transition: border-color 220ms ease-out, background 240ms ease-out;
 }
@@ -604,8 +661,8 @@ onBeforeUnmount(() => {
 .flow-tile__surface::after {
   position: absolute;
   background:
-    linear-gradient(104deg, transparent 0 43%, rgb(255 255 255 / 6%) 44%, transparent 45%),
-    radial-gradient(circle at 75% 36%, transparent 0 12%, rgb(255 255 255 / 5%) 12.5%, transparent 13%);
+    linear-gradient(104deg, transparent 0 43%, var(--color-tile-decoration) 44%, transparent 45%),
+    radial-gradient(circle at 75% 36%, transparent 0 12%, var(--color-tile-decoration) 12.5%, transparent 13%);
   content: '';
   inset: 0;
 }
@@ -627,7 +684,7 @@ onBeforeUnmount(() => {
 .flow-tile__topline {
   display: flex;
   justify-content: space-between;
-  color: rgb(246 241 235 / 58%);
+  color: var(--color-tile-topline);
   font-size: .56rem;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
@@ -661,7 +718,7 @@ onBeforeUnmount(() => {
   width: 1.1rem;
   height: 2px;
   margin-right: .25rem;
-  background: rgb(255 255 255 / 14%);
+  background: var(--color-weight-empty);
 }
 
 .flow-tile__weight i.is-filled {
@@ -682,7 +739,7 @@ onBeforeUnmount(() => {
   border-color: rgb(var(--accent) / 76%);
   background:
     radial-gradient(circle at 22% 26%, rgb(var(--accent) / 32%), transparent 42%),
-    linear-gradient(135deg, rgb(57 53 58 / 99%), rgb(29 28 32 / 99%) 58%, rgb(16 16 18 / 100%));
+    linear-gradient(135deg, var(--color-tile-active-start), var(--color-tile-active-middle) 58%, var(--color-tile-active-end));
 }
 
 .flow-tile:active {
@@ -695,7 +752,7 @@ onBeforeUnmount(() => {
   bottom: max(1.25rem, env(safe-area-inset-bottom));
   left: max(clamp(1.5rem, 4vw, 4.5rem), env(safe-area-inset-left));
   margin: 0;
-  color: rgb(246 241 235 / 36%);
+  color: var(--color-footer);
   font-size: .56rem;
   letter-spacing: .18em;
 }
@@ -704,7 +761,7 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: 100;
   display: grid;
-  background: #050609;
+  background: var(--color-reveal);
   opacity: 1;
   pointer-events: none;
   place-items: center;
@@ -717,7 +774,7 @@ onBeforeUnmount(() => {
   width: min(34vw, 24rem);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: rgb(244 118 152 / 12%);
+  background: var(--color-reveal-glow);
   filter: blur(64px);
   transform: scale(.5);
   transition: transform 1000ms cubic-bezier(.16, 1, .3, 1);
@@ -794,7 +851,7 @@ onBeforeUnmount(() => {
     width: auto;
     padding: .85rem 1rem;
     border: 1px solid var(--color-border);
-    background: rgb(8 9 12 / 88%);
+    background: var(--color-mobile-inspector);
     backdrop-filter: blur(12px);
   }
 
@@ -903,6 +960,11 @@ onBeforeUnmount(() => {
   .reveal-mask,
   .reveal-mask span {
     animation: none;
+    transition: none;
+  }
+
+  .thinking-page,
+  .thinking-scene {
     transition: none;
   }
 
