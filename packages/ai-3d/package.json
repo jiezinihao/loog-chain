@@ -5,5 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "catalog:",
+    "cesium": "catalog:",
+    "gsap": "catalog:",
+    "phaser": "catalog:",
+    "three": "catalog:",
+    "vue": "catalog:",
+    "vue-router": "catalog:"
   }
 }
