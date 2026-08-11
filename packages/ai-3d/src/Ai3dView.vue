@@ -372,7 +372,7 @@ onBeforeUnmount(disposeScene);
 
 .ai-page {
   --page-background: #080a0f;
-  --page-surface: rgb(13 16 24 / 60%);
+  --page-surface: rgb(13 16 24 / 30%);
   --page-surface-active: rgb(24 28 40 / 92%);
   --page-foreground: #f4f5f8;
   --page-muted: #a5abb7;
@@ -400,7 +400,7 @@ onBeforeUnmount(disposeScene);
 
 :global(html[data-theme='light']) .ai-page {
   --page-background: #f1f0ec;
-  --page-surface: rgb(250 249 246 / 60%);
+  --page-surface: rgb(250 249 246 / 30%);
   --page-surface-active: rgb(255 255 255 / 96%);
   --page-foreground: #20232a;
   --page-muted: #565d69;
