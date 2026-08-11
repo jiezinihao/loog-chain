@@ -1,248 +1,303 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import * as THREE from 'three';
 
-type ExperimentCategory = 'three' | 'cesium' | 'game';
+type ProjectId = 'three' | 'cesium' | 'game';
 
-interface Experiment {
+interface ProjectExample {
   id: string;
-  category: ExperimentCategory;
-  index: string;
-  title: string;
-  summary: string;
-  meta: string;
-  status: string;
+  name: string;
+  stack: string;
 }
 
-const categories: Array<{ id: ExperimentCategory; label: string; code: string }> = [
-  { id: 'three', label: 'Three', code: 'WEBGL' },
-  { id: 'cesium', label: 'Cesium', code: 'GLOBE' },
-  { id: 'game', label: 'Game', code: 'PLAY' },
-];
+interface ProjectDefinition {
+  id: ProjectId;
+  index: string;
+  name: string;
+  code: string;
+  examples: ProjectExample[];
+}
 
-const experiments: Experiment[] = [
+const projects: ProjectDefinition[] = [
   {
-    id: 'particle-gravity',
-    category: 'three',
+    id: 'three',
     index: '01',
-    title: '粒子引力场',
-    summary: '用空间噪声和鼠标向量构造持续流动的粒子轨迹，观察交互输入如何改变群体运动。',
-    meta: 'THREE.JS / GLSL',
-    status: '实验中',
+    name: 'Three',
+    code: 'REALTIME 3D',
+    examples: [
+      { id: 'particle-field', name: '粒子引力场', stack: 'THREE.JS / GLSL' },
+      { id: 'glass-refraction', name: '折射材质', stack: 'THREE.JS / MATERIAL' },
+      { id: 'model-deconstruction', name: '模型拆解动画', stack: 'THREE.JS / GSAP' },
+    ],
   },
   {
-    id: 'glass-refraction',
-    category: 'three',
+    id: 'cesium',
     index: '02',
-    title: '折射材质研究',
-    summary: '围绕透射、色散与环境光照建立材质练习，记录实时渲染中的视觉取舍。',
-    meta: 'THREE.JS / MATERIAL',
-    status: '构建中',
+    name: 'Cesium',
+    code: 'DIGITAL GLOBE',
+    examples: [
+      { id: 'earth-day-night', name: '地球昼夜轨迹', stack: 'CESIUM / TIMELINE' },
+      { id: 'city-data-stream', name: '城市数据流', stack: 'CESIUM / 3D TILES' },
+      { id: 'global-flight-path', name: '全球航线追踪', stack: 'CESIUM / ENTITY' },
+    ],
   },
   {
-    id: 'earth-orbit',
-    category: 'cesium',
+    id: 'game',
     index: '03',
-    title: '地球昼夜轨迹',
-    summary: '把时间、轨道和地表光照组织成可探索的空间叙事，呈现一天中的连续变化。',
-    meta: 'CESIUM / TIMELINE',
-    status: '实验中',
-  },
-  {
-    id: 'city-stream',
-    category: 'cesium',
-    index: '04',
-    title: '城市数据流',
-    summary: '尝试将城市级数据映射到三维地理空间，在信息密度与阅读效率之间寻找平衡。',
-    meta: 'CESIUM / 3D TILES',
-    status: '构思中',
-  },
-  {
-    id: 'kinetic-room',
-    category: 'game',
-    index: '05',
-    title: '动量房间',
-    summary: '以短循环关卡验证碰撞、惯性与反馈节奏，让物理规则成为游戏本身。',
-    meta: 'PHASER / RAPIER',
-    status: '原型中',
-  },
-  {
-    id: 'signal-hunter',
-    category: 'game',
-    index: '06',
-    title: '信号猎手',
-    summary: '通过声音提示和有限视野建立探索压力，测试极简规则能否形成清晰的决策空间。',
-    meta: 'CANVAS / AUDIO',
-    status: '构思中',
+    name: 'Game',
+    code: 'PLAYABLE IDEAS',
+    examples: [
+      { id: 'rubiks-cube', name: '还原魔方', stack: 'THREE.JS / PHASER' },
+      { id: 'snake', name: '贪吃蛇', stack: 'PHASER' },
+      { id: 'platform-jump', name: '像素平台跳跃', stack: 'PHASER / RAPIER' },
+      { id: 'space-shooter', name: '太空射击', stack: 'THREE.JS / PHASER' },
+    ],
   },
 ];
 
-const activeCategory = ref<ExperimentCategory>('three');
+const activeProjectId = ref<ProjectId>('three');
+const pageElement = ref<HTMLElement>();
 const canvasElement = ref<HTMLCanvasElement>();
-const mainElement = ref<HTMLElement>();
-const reducedMotion = ref(false);
-let animationFrame = 0;
+const activeProject = computed(
+  () => projects.find((project) => project.id === activeProjectId.value) ?? projects[0],
+);
+
+let renderer: THREE.WebGLRenderer | undefined;
+let camera: THREE.PerspectiveCamera | undefined;
+let scene: THREE.Scene | undefined;
+let sceneGroup: THREE.Group | undefined;
+let wireMaterial: THREE.MeshBasicMaterial | undefined;
+let ringMaterial: THREE.MeshBasicMaterial | undefined;
+let pointMaterial: THREE.PointsMaterial | undefined;
 let resizeObserver: ResizeObserver | undefined;
 let themeObserver: MutationObserver | undefined;
+let animationFrame = 0;
+let lastFrameTime = 0;
+let elapsedTime = 0;
+let motionDeadline = 0;
 let pointerX = 0;
 let pointerY = 0;
-let canvasColors = {
-  background: '#090b11',
-  primary: '#8f7cff',
-  secondary: '#5ce4ce',
-  line: 'rgba(255, 255, 255, .18)',
-};
+let reducedMotion = false;
+const geometries: THREE.BufferGeometry[] = [];
+const materials: THREE.Material[] = [];
 
-const activeCategoryInfo = computed(() =>
-  categories.find((category) => category.id === activeCategory.value) ?? categories[0],
-);
-const filteredExperiments = computed(() =>
-  experiments.filter((experiment) => experiment.category === activeCategory.value),
-);
-
-function selectCategory(category: ExperimentCategory) {
-  activeCategory.value = category;
+function selectProject(projectId: ProjectId) {
+  activeProjectId.value = projectId;
 }
 
-function getCanvasColors() {
-  const styles = getComputedStyle(mainElement.value ?? document.documentElement);
-  return {
-    background: styles.getPropertyValue('--ai-canvas-background').trim() || '#090b11',
-    primary: styles.getPropertyValue('--ai-canvas-primary').trim() || '#8f7cff',
-    secondary: styles.getPropertyValue('--ai-canvas-secondary').trim() || '#5ce4ce',
-    line: styles.getPropertyValue('--ai-canvas-line').trim() || 'rgba(255, 255, 255, .18)',
-  };
-}
+function createParticleGeometry() {
+  const count = 160;
+  const positions = new Float32Array(count * 3);
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
 
-// Canvas 仅负责首屏氛围，不承载信息，缩放时限制 DPR 以控制每帧绘制成本。
-function resizeCanvas() {
-  const canvas = canvasElement.value;
-  if (!canvas) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  drawCanvas(performance.now());
-}
-
-function refreshCanvasColors() {
-  canvasColors = getCanvasColors();
-  resizeCanvas();
-}
-
-function drawCanvas(time: number) {
-  const canvas = canvasElement.value;
-  const context = canvas?.getContext('2d');
-  if (!canvas || !context) return;
-
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const width = canvas.width / dpr;
-  const height = canvas.height / dpr;
-  const colors = canvasColors;
-  const elapsed = reducedMotion.value ? 0 : time * 0.00028;
-  const centerX = width * (0.63 + pointerX * 0.035);
-  const centerY = height * (0.48 + pointerY * 0.035);
-  const radius = Math.min(width, height) * 0.3;
-
-  context.setTransform(dpr, 0, 0, dpr, 0, 0);
-  context.clearRect(0, 0, width, height);
-  context.fillStyle = colors.background;
-  context.fillRect(0, 0, width, height);
-
-  const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 1.8);
-  glow.addColorStop(0, `${colors.primary}52`);
-  glow.addColorStop(0.46, `${colors.secondary}1f`);
-  glow.addColorStop(1, 'transparent');
-  context.fillStyle = glow;
-  context.fillRect(0, 0, width, height);
-
-  // 多层椭圆轨道用二维绘制模拟三维景深，保持实现轻量且不提前引入 WebGL。
-  for (let ring = 0; ring < 5; ring += 1) {
-    context.save();
-    context.translate(centerX, centerY);
-    context.rotate(elapsed * (ring % 2 === 0 ? 1 : -0.72) + ring * 0.58);
-    context.scale(1, 0.34 + ring * 0.025);
-    context.beginPath();
-    context.arc(0, 0, radius * (0.48 + ring * 0.14), 0, Math.PI * 2);
-    context.strokeStyle = colors.line;
-    context.lineWidth = 1;
-    context.stroke();
-    context.restore();
+  // 使用确定性的球面分布生成点云，刷新页面时保持视觉构图稳定。
+  for (let index = 0; index < count; index += 1) {
+    const y = 1 - (index / (count - 1)) * 2;
+    const radius = Math.sqrt(1 - y * y);
+    const angle = goldenAngle * index;
+    const distance = 1.75 + (index % 7) * 0.085;
+    positions[index * 3] = Math.cos(angle) * radius * distance;
+    positions[index * 3 + 1] = y * distance;
+    positions[index * 3 + 2] = Math.sin(angle) * radius * distance;
   }
 
-  for (let index = 0; index < 72; index += 1) {
-    const phase = (index / 72) * Math.PI * 2;
-    const orbit = radius * (0.34 + (index % 9) * 0.07);
-    const depth = Math.sin(phase * 2.4 + elapsed * 5);
-    const x = centerX + Math.cos(phase + elapsed * (1 + (index % 4) * 0.08)) * orbit;
-    const y = centerY + Math.sin(phase + elapsed * 1.4) * orbit * 0.38 + depth * radius * 0.13;
-    const size = 0.8 + ((depth + 1) / 2) * 2.2;
-
-    context.beginPath();
-    context.arc(x, y, size, 0, Math.PI * 2);
-    context.fillStyle = index % 3 === 0 ? colors.secondary : colors.primary;
-    context.globalAlpha = 0.28 + ((depth + 1) / 2) * 0.65;
-    context.fill();
-  }
-
-  context.globalAlpha = 1;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  return geometry;
 }
 
-function animate(time: number) {
-  drawCanvas(time);
-  if (!reducedMotion.value) {
-    animationFrame = window.requestAnimationFrame(animate);
+function updateSceneTheme() {
+  const page = pageElement.value;
+  if (!page) return;
+
+  const styles = getComputedStyle(page);
+  wireMaterial?.color.set(styles.getPropertyValue('--three-wire').trim() || '#8f82ff');
+  ringMaterial?.color.set(styles.getPropertyValue('--three-ring').trim() || '#5ce4cf');
+  pointMaterial?.color.set(styles.getPropertyValue('--three-point').trim() || '#d3ccff');
+  renderScene();
+}
+
+function resizeScene() {
+  const canvas = canvasElement.value;
+  if (!canvas || !renderer || !camera) return;
+
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (width === 0 || height === 0) return;
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setSize(width, height, false);
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderScene();
+}
+
+function renderScene() {
+  if (renderer && scene && camera) {
+    renderer.render(scene, camera);
+  }
+}
+
+function renderFrame(time: number) {
+  if (!sceneGroup) return;
+
+  if (lastFrameTime > 0) {
+    elapsedTime += Math.min((time - lastFrameTime) / 1000, 0.05);
+  }
+  lastFrameTime = time;
+
+  sceneGroup.rotation.x += (-0.22 + pointerY * 0.28 - sceneGroup.rotation.x) * 0.035;
+  sceneGroup.rotation.y += (elapsedTime * 0.14 + pointerX * 0.42 - sceneGroup.rotation.y) * 0.035;
+  sceneGroup.rotation.z = Math.sin(elapsedTime * 0.24) * 0.08;
+  renderScene();
+
+  if (!reducedMotion && !document.hidden && time < motionDeadline) {
+    animationFrame = window.requestAnimationFrame(renderFrame);
+  } else {
+    animationFrame = 0;
+    lastFrameTime = 0;
+  }
+}
+
+function scheduleMotion(duration = 1800) {
+  if (reducedMotion || document.hidden) return;
+  motionDeadline = performance.now() + duration;
+  if (animationFrame === 0) {
+    animationFrame = window.requestAnimationFrame(renderFrame);
   }
 }
 
 function updatePointer(event: PointerEvent) {
-  const canvas = canvasElement.value;
-  if (!canvas || reducedMotion.value) return;
-
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  pointerX = event.offsetX / (canvas.width / dpr) - 0.5;
-  pointerY = event.offsetY / (canvas.height / dpr) - 0.5;
+  if (reducedMotion) return;
+  pointerX = event.clientX / window.innerWidth - 0.5;
+  pointerY = event.clientY / window.innerHeight - 0.5;
+  scheduleMotion();
 }
 
-// 页面进入后台时暂停帧循环，恢复后再继续，避免不可见状态占用渲染资源。
+// 页面进入后台时暂停 WebGL 帧循环，返回后从当前姿态继续渲染。
 function handleVisibilityChange() {
   window.cancelAnimationFrame(animationFrame);
-  if (!document.hidden && !reducedMotion.value) {
-    animationFrame = window.requestAnimationFrame(animate);
+  animationFrame = 0;
+  lastFrameTime = 0;
+  if (!document.hidden && !reducedMotion) {
+    scheduleMotion(4000);
   }
+}
+
+function initializeScene() {
+  const canvas = canvasElement.value;
+  if (!canvas) return;
+
+  renderer = new THREE.WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: true,
+    powerPreference: 'high-performance',
+  });
+  renderer.setClearColor(0x000000, 0);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 0, 7);
+  sceneGroup = new THREE.Group();
+  sceneGroup.position.set(1.35, -0.1, 0);
+  scene.add(sceneGroup);
+
+  const coreGeometry = new THREE.IcosahedronGeometry(1.5, 2);
+  wireMaterial = new THREE.MeshBasicMaterial({
+    color: 0x8f82ff,
+    transparent: true,
+    opacity: 0.32,
+    wireframe: true,
+  });
+  const core = new THREE.Mesh(coreGeometry, wireMaterial);
+
+  ringMaterial = new THREE.MeshBasicMaterial({
+    color: 0x5ce4cf,
+    transparent: true,
+    opacity: 0.52,
+    wireframe: true,
+  });
+  const outerRingGeometry = new THREE.TorusGeometry(2.12, 0.014, 5, 64);
+  const innerRingGeometry = new THREE.TorusGeometry(1.83, 0.01, 5, 64);
+  const outerRing = new THREE.Mesh(outerRingGeometry, ringMaterial);
+  const innerRing = new THREE.Mesh(innerRingGeometry, ringMaterial);
+  outerRing.rotation.set(Math.PI * 0.66, Math.PI * 0.18, 0);
+  innerRing.rotation.set(Math.PI * 0.2, Math.PI * 0.58, 0);
+
+  const particleGeometry = createParticleGeometry();
+  pointMaterial = new THREE.PointsMaterial({
+    color: 0xd3ccff,
+    size: 0.035,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.82,
+    depthWrite: false,
+  });
+  const particles = new THREE.Points(particleGeometry, pointMaterial);
+
+  geometries.push(coreGeometry, outerRingGeometry, innerRingGeometry, particleGeometry);
+  materials.push(wireMaterial, ringMaterial, pointMaterial);
+  sceneGroup.add(core, outerRing, innerRing, particles);
+
+  resizeObserver = new ResizeObserver(resizeScene);
+  resizeObserver.observe(canvas);
+  themeObserver = new MutationObserver(updateSceneTheme);
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  pageElement.value?.addEventListener('pointermove', updatePointer);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  updateSceneTheme();
+  resizeScene();
+  motionDeadline = performance.now() + 12000;
+  renderFrame(performance.now());
+}
+
+function disposeScene() {
+  window.cancelAnimationFrame(animationFrame);
+  animationFrame = 0;
+  resizeObserver?.disconnect();
+  themeObserver?.disconnect();
+  pageElement.value?.removeEventListener('pointermove', updatePointer);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((material) => material.dispose());
+  renderer?.dispose();
+  renderer?.forceContextLoss();
+  geometries.length = 0;
+  materials.length = 0;
+  renderer = undefined;
+  camera = undefined;
+  scene = undefined;
+  sceneGroup = undefined;
+  wireMaterial = undefined;
+  ringMaterial = undefined;
+  pointMaterial = undefined;
 }
 
 onMounted(async () => {
   await nextTick();
-  mainElement.value?.focus();
-  reducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  pageElement.value?.focus();
+  reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const canvas = canvasElement.value;
-  if (!canvas) return;
-
-  resizeObserver = new ResizeObserver(resizeCanvas);
-  resizeObserver.observe(canvas);
-  themeObserver = new MutationObserver(refreshCanvasColors);
-  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  canvas.addEventListener('pointermove', updatePointer);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-  refreshCanvasColors();
-  animate(performance.now());
+  try {
+    initializeScene();
+  } catch (error) {
+    // WebGL 不可用时保留完整项目列表，Three.js 仅作为渐进增强。
+    console.warn('Three.js 背景初始化失败，页面将使用静态背景。', error);
+    disposeScene();
+  }
 });
 
-onBeforeUnmount(() => {
-  window.cancelAnimationFrame(animationFrame);
-  resizeObserver?.disconnect();
-  themeObserver?.disconnect();
-  canvasElement.value?.removeEventListener('pointermove', updatePointer);
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
-});
+onBeforeUnmount(disposeScene);
 </script>
 
 <template>
-  <main ref="mainElement" class="ai-page" tabindex="-1">
-    <a class="skip-link" href="#experiment-list">跳至实验列表</a>
+  <main ref="pageElement" class="ai-page" tabindex="-1">
+    <a class="skip-link" href="#project-browser">跳至项目与例子列表</a>
+    <canvas ref="canvasElement" class="three-stage" aria-hidden="true"></canvas>
+    <div class="background-grid" aria-hidden="true"></div>
 
     <header class="ai-header">
       <RouterLink class="brand-link" to="/" aria-label="返回 Think Chain 首页">
@@ -251,63 +306,58 @@ onBeforeUnmount(() => {
         </svg>
         <span>THINK CHAIN</span>
       </RouterLink>
-      <span class="header-mark" aria-hidden="true">AI / 3D</span>
+      <span class="header-mark">AI / 3D</span>
     </header>
 
-    <section class="hero" aria-labelledby="ai-3d-title">
-      <canvas ref="canvasElement" class="hero-canvas" aria-hidden="true"></canvas>
-      <div class="hero-grid" aria-hidden="true"></div>
-      <div class="hero-copy">
-        <p class="eyebrow">CREATIVE COMPUTING / 2026</p>
-        <h1 id="ai-3d-title">构造数字<br /><em>空间实验</em></h1>
-        <p class="hero-description">收集关于实时渲染、地理空间与互动游戏的练习。先从一个想法出发，再让它变得可以被看见、触碰和体验。</p>
+    <section id="project-browser" class="workspace" aria-labelledby="page-title">
+      <header class="workspace-heading">
+        <div>
+          <p>AI EXPLORATION / CODE LIMITS</p>
+          <h1 id="page-title"><span>AI</span> 探索编程极限</h1>
+        </div>
+        <p class="project-total" aria-label="共 3 个项目"><strong>03</strong><span>PROJECTS</span></p>
+      </header>
+
+      <div class="browser-layout">
+        <aside class="project-panel">
+          <p class="section-label">PROJECTS / 项目</p>
+          <nav class="project-nav" aria-label="项目分类">
+            <button
+              v-for="project in projects"
+              :key="project.id"
+              class="project-button"
+              :class="{ 'project-button--active': project.id === activeProjectId }"
+              type="button"
+              :aria-pressed="project.id === activeProjectId"
+              @click="selectProject(project.id)"
+            >
+              <span class="project-index">{{ project.index }}</span>
+              <span class="project-name">{{ project.name }}</span>
+              <span class="project-count">{{ String(project.examples.length).padStart(2, '0') }}</span>
+            </button>
+          </nav>
+        </aside>
+
+        <section class="example-panel" aria-labelledby="example-title">
+          <header class="example-heading">
+            <div>
+              <p class="section-label">EXAMPLES / 例子</p>
+              <h2 id="example-title">{{ activeProject.name }}</h2>
+            </div>
+            <p><span>{{ activeProject.code }}</span>{{ activeProject.examples.length }} 个例子</p>
+          </header>
+
+          <ol class="example-list" aria-live="polite">
+            <li v-for="(example, index) in activeProject.examples" :key="example.id" class="example-item">
+              <span class="example-index">{{ String(index + 1).padStart(2, '0') }}</span>
+              <h3>{{ example.name }}</h3>
+              <p>{{ example.stack }}</p>
+              <span class="display-mark">仅展示</span>
+            </li>
+          </ol>
+        </section>
       </div>
-      <div class="hero-aside" aria-hidden="true">
-        <span>CANVAS STUDY</span>
-        <strong>2D → 3D</strong>
-      </div>
-      <p class="scroll-cue" aria-hidden="true"><span></span>SCROLL TO EXPLORE</p>
     </section>
-
-    <section id="experiment-list" class="catalogue" aria-labelledby="catalogue-title">
-      <aside class="category-panel">
-        <p class="section-label">FILTER / 分类</p>
-        <h2 id="catalogue-title">实验索引</h2>
-        <nav class="category-nav" aria-label="实验分类">
-          <button
-            v-for="category in categories"
-            :key="category.id"
-            class="category-button"
-            :class="{ 'category-button--active': category.id === activeCategory }"
-            type="button"
-            :aria-pressed="category.id === activeCategory"
-            @click="selectCategory(category.id)"
-          >
-            <span>{{ category.label }}</span>
-            <small>{{ category.code }}</small>
-          </button>
-        </nav>
-        <p class="category-note">当前收录 {{ filteredExperiments.length }} 个 {{ activeCategoryInfo.label }} 实验</p>
-      </aside>
-
-      <div class="experiment-list" aria-live="polite">
-        <article v-for="experiment in filteredExperiments" :key="experiment.id" class="experiment-card">
-          <span class="experiment-index">{{ experiment.index }}</span>
-          <div class="experiment-content">
-            <p>{{ experiment.meta }}</p>
-            <h3>{{ experiment.title }}</h3>
-            <p class="experiment-summary">{{ experiment.summary }}</p>
-          </div>
-          <span class="experiment-status"><i aria-hidden="true"></i>{{ experiment.status }}</span>
-        </article>
-      </div>
-    </section>
-
-    <footer class="ai-footer">
-      <p>AI · 3D LAB</p>
-      <p>BUILDING VISUAL IDEAS INTO REAL-TIME EXPERIENCES.</p>
-      <RouterLink to="/">返回入口</RouterLink>
-    </footer>
   </main>
 </template>
 
@@ -321,46 +371,77 @@ onBeforeUnmount(() => {
 }
 
 .ai-page {
-  --ai-background: #090b11;
-  --ai-surface: #0e1119;
-  --ai-surface-raised: #141824;
-  --ai-foreground: #f3f5f7;
-  --ai-muted: #9ca3b2;
-  --ai-subtle: #707887;
-  --ai-border: rgb(255 255 255 / 14%);
-  --ai-border-strong: rgb(255 255 255 / 28%);
-  --ai-accent: #a897ff;
-  --ai-accent-secondary: #68e4d2;
-  --ai-focus: #68e4d2;
-  --ai-canvas-background: #090b11;
-  --ai-canvas-primary: #9f8cff;
-  --ai-canvas-secondary: #5ce4ce;
-  --ai-canvas-line: rgb(255 255 255 / 18%);
+  --page-background: #080a0f;
+  --page-surface: rgb(13 16 24 / 88%);
+  --page-surface-active: rgb(24 28 40 / 92%);
+  --page-foreground: #f4f5f8;
+  --page-muted: #a5abb7;
+  --page-subtle: #747c8b;
+  --page-border: rgb(255 255 255 / 14%);
+  --page-border-strong: rgb(255 255 255 / 28%);
+  --page-accent: #9f91ff;
+  --page-accent-secondary: #68e5d1;
+  --page-focus: #68e5d1;
+  --three-wire: #9485ff;
+  --three-ring: #62e5d1;
+  --three-point: #d4ceff;
+  position: relative;
   min-width: 320px;
   min-height: 100dvh;
   overflow: hidden;
-  background: var(--ai-background);
-  color: var(--ai-foreground);
+  background:
+    radial-gradient(circle at 76% 36%, rgb(96 80 207 / 16%), transparent 31rem),
+    var(--page-background);
+  color: var(--page-foreground);
   outline: none;
+  isolation: isolate;
   transition: background-color 220ms ease, color 220ms ease;
 }
 
 :global(html[data-theme='light']) .ai-page {
-  --ai-background: #f3f1ed;
-  --ai-surface: #faf9f6;
-  --ai-surface-raised: #fff;
-  --ai-foreground: #1d2027;
-  --ai-muted: #565d69;
-  --ai-subtle: #6f7580;
-  --ai-border: rgb(29 32 39 / 17%);
-  --ai-border-strong: rgb(29 32 39 / 31%);
-  --ai-accent: #6550c9;
-  --ai-accent-secondary: #087c70;
-  --ai-focus: #5540b3;
-  --ai-canvas-background: #e9e6f0;
-  --ai-canvas-primary: #755ed2;
-  --ai-canvas-secondary: #168f82;
-  --ai-canvas-line: rgb(38 34 58 / 22%);
+  --page-background: #f1f0ec;
+  --page-surface: rgb(250 249 246 / 91%);
+  --page-surface-active: rgb(255 255 255 / 96%);
+  --page-foreground: #20232a;
+  --page-muted: #565d69;
+  --page-subtle: #707681;
+  --page-border: rgb(32 35 42 / 18%);
+  --page-border-strong: rgb(32 35 42 / 32%);
+  --page-accent: #6450c4;
+  --page-accent-secondary: #087c70;
+  --page-focus: #533eae;
+  --three-wire: #6652c7;
+  --three-ring: #0e8a7c;
+  --three-point: #765fd1;
+  background:
+    radial-gradient(circle at 76% 36%, rgb(101 79 193 / 13%), transparent 31rem),
+    var(--page-background);
+}
+
+.three-stage,
+.background-grid {
+  position: absolute;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+}
+
+.three-stage {
+  display: block;
+  opacity: .9;
+  mask-image: linear-gradient(90deg, transparent 22%, #000 58%, #000 100%);
+}
+
+.background-grid {
+  z-index: -1;
+  opacity: .22;
+  background-image:
+    linear-gradient(var(--page-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--page-border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(90deg, #000, transparent 72%);
 }
 
 .skip-link {
@@ -369,8 +450,8 @@ onBeforeUnmount(() => {
   top: 1rem;
   left: 1rem;
   padding: .75rem 1rem;
-  background: var(--ai-foreground);
-  color: var(--ai-background);
+  background: var(--page-foreground);
+  color: var(--page-background);
   font-size: .78rem;
   font-weight: 700;
   text-decoration: none;
@@ -383,17 +464,14 @@ onBeforeUnmount(() => {
 }
 
 .ai-header {
-  position: absolute;
+  position: relative;
   z-index: 10;
-  top: 0;
-  right: 0;
-  left: 0;
   display: flex;
   min-height: 72px;
   align-items: center;
   justify-content: space-between;
   padding: max(1rem, env(safe-area-inset-top)) max(10.5rem, calc(env(safe-area-inset-right) + 10.5rem)) 1rem max(1.5rem, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--ai-border);
+  border-bottom: 1px solid var(--page-border);
 }
 
 .brand-link {
@@ -405,6 +483,7 @@ onBeforeUnmount(() => {
   font-weight: 750;
   letter-spacing: .16em;
   text-decoration: none;
+  transition: color 180ms ease;
 }
 
 .brand-link svg {
@@ -418,181 +497,114 @@ onBeforeUnmount(() => {
 }
 
 .brand-link:hover {
-  color: var(--ai-accent-secondary);
+  color: var(--page-accent-secondary);
 }
 
 .brand-link:focus-visible,
-.category-button:focus-visible,
-.ai-footer a:focus-visible {
-  outline: 2px solid var(--ai-focus);
-  outline-offset: 4px;
+.project-button:focus-visible {
+  outline: 2px solid var(--page-focus);
+  outline-offset: 3px;
 }
 
 .header-mark {
-  color: var(--ai-muted);
+  color: var(--page-muted);
   font-size: .68rem;
   font-weight: 700;
   letter-spacing: .17em;
 }
 
-.hero {
+.workspace {
   position: relative;
-  min-height: min(900px, 100dvh);
-  overflow: hidden;
-  border-bottom: 1px solid var(--ai-border);
-  isolation: isolate;
+  z-index: 1;
+  width: min(100%, 1520px);
+  min-height: calc(100dvh - 72px);
+  margin: 0 auto;
+  padding: clamp(2.75rem, 5vw, 5rem) clamp(1.5rem, 5vw, 5rem) clamp(4rem, 7vw, 7rem);
 }
 
-.hero-canvas,
-.hero-grid {
-  position: absolute;
-  z-index: -2;
-  width: 100%;
-  height: 100%;
-  inset: 0;
+.workspace-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: clamp(2.5rem, 5vw, 4.5rem);
 }
 
-.hero-canvas {
-  display: block;
-}
-
-.hero-grid {
-  z-index: -1;
-  opacity: .35;
-  background-image:
-    linear-gradient(var(--ai-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ai-border) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: linear-gradient(to right, #000, transparent 72%);
-}
-
-.hero-copy {
-  position: absolute;
-  top: 50%;
-  left: max(clamp(1.5rem, 7vw, 7rem), env(safe-area-inset-left));
-  width: min(48rem, calc(100% - 3rem));
-  transform: translateY(-43%);
-}
-
-.eyebrow,
+.workspace-heading > div > p,
 .section-label {
   margin: 0;
-  color: var(--ai-accent-secondary);
-  font-size: .68rem;
+  color: var(--page-accent-secondary);
+  font-size: .65rem;
   font-weight: 750;
   letter-spacing: .2em;
 }
 
-.hero h1 {
-  margin: 1.2rem 0 1.75rem;
-  font-size: clamp(4rem, 9.2vw, 9rem);
-  font-weight: 580;
-  letter-spacing: -.085em;
-  line-height: .82;
+.workspace-heading h1 {
+  margin: .75rem 0 0;
+  font-size: clamp(3rem, 6.3vw, 6.4rem);
+  font-weight: 570;
+  letter-spacing: -.075em;
+  line-height: .95;
 }
 
-.hero h1 em {
-  color: var(--ai-accent);
+.workspace-heading h1 span {
+  color: var(--page-accent);
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 400;
 }
 
-.hero-description {
-  max-width: 34rem;
-  margin: 0;
-  color: var(--ai-muted);
-  font-size: clamp(.95rem, 1.3vw, 1.08rem);
-  line-height: 1.8;
-}
-
-.hero-aside {
-  position: absolute;
-  right: max(clamp(2rem, 5vw, 5rem), env(safe-area-inset-right));
-  bottom: 4.5rem;
+.project-total {
   display: flex;
   align-items: flex-end;
-  flex-direction: column;
-}
-
-.hero-aside span,
-.scroll-cue {
-  color: var(--ai-muted);
-  font-size: .63rem;
-  font-weight: 700;
-  letter-spacing: .18em;
-}
-
-.hero-aside strong {
-  margin-top: .45rem;
-  color: var(--ai-foreground);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.8rem;
-  font-weight: 400;
-  letter-spacing: -.04em;
-}
-
-.scroll-cue {
-  position: absolute;
-  bottom: 4.5rem;
-  left: max(clamp(1.5rem, 7vw, 7rem), env(safe-area-inset-left));
-  display: flex;
-  align-items: center;
   margin: 0;
+  color: var(--page-muted);
 }
 
-.scroll-cue span {
-  display: block;
-  width: 3rem;
-  height: 1px;
-  margin-right: 1rem;
-  overflow: hidden;
-  background: var(--ai-border-strong);
+.project-total strong {
+  margin-right: .8rem;
+  color: var(--page-foreground);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.8rem;
+  font-weight: 400;
+  line-height: .8;
 }
 
-.scroll-cue span::after {
-  display: block;
-  width: 48%;
-  height: 1px;
-  background: var(--ai-accent-secondary);
-  content: '';
+.project-total span {
+  font-size: .62rem;
+  font-weight: 750;
+  letter-spacing: .17em;
 }
 
-.catalogue {
+.browser-layout {
   display: grid;
-  grid-template-columns: minmax(17rem, 30%) 1fr;
-  max-width: 1440px;
-  min-height: 650px;
-  margin: 0 auto;
-  padding: clamp(5rem, 9vw, 9rem) clamp(1.5rem, 5vw, 5rem);
+  grid-template-columns: minmax(15rem, 22%) minmax(0, 1fr);
+  border-top: 1px solid var(--page-border-strong);
+  border-bottom: 1px solid var(--page-border-strong);
+  background: var(--page-surface);
+  backdrop-filter: blur(18px);
 }
 
-.category-panel {
-  padding-right: clamp(2rem, 5vw, 5rem);
+.project-panel {
+  padding: 2rem clamp(1.5rem, 3vw, 2.75rem) 2.75rem;
+  border-right: 1px solid var(--page-border-strong);
 }
 
-.category-panel h2 {
-  margin: .9rem 0 2.75rem;
-  font-size: clamp(2.7rem, 5vw, 4.5rem);
-  font-weight: 590;
-  letter-spacing: -.07em;
+.project-nav {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--page-border);
 }
 
-.category-nav {
-  border-top: 1px solid var(--ai-border);
-}
-
-.category-button {
+.project-button {
   position: relative;
-  display: flex;
+  display: grid;
   width: 100%;
-  min-height: 64px;
+  min-height: 72px;
+  grid-template-columns: 2.5rem 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 0;
+  padding: 0 .75rem 0 0;
   border: 0;
-  border-bottom: 1px solid var(--ai-border);
+  border-bottom: 1px solid var(--page-border);
   background: transparent;
-  color: var(--ai-muted);
+  color: var(--page-muted);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -600,282 +612,253 @@ onBeforeUnmount(() => {
   transition: background-color 180ms ease, color 180ms ease;
 }
 
-.category-button span {
-  font-size: 1rem;
-  font-weight: 650;
-  transition: transform 180ms ease;
-}
-
-.category-button small {
-  color: var(--ai-subtle);
-  font-size: .62rem;
-  letter-spacing: .15em;
-}
-
-.category-button:hover,
-.category-button--active {
-  background: var(--ai-surface);
-  color: var(--ai-foreground);
-}
-
-.category-button--active::before {
+.project-button::before {
   position: absolute;
-  left: .1rem;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--ai-accent-secondary);
+  left: 0;
+  width: 3px;
+  height: 0;
+  background: var(--page-accent-secondary);
   content: '';
+  transition: height 220ms cubic-bezier(.16, 1, .3, 1);
 }
 
-.category-button--active span {
-  transform: translateX(.9rem);
+.project-button:hover,
+.project-button--active {
+  background: var(--page-surface-active);
+  color: var(--page-foreground);
 }
 
-.category-note {
-  margin: 1.5rem 0 0;
-  color: var(--ai-subtle);
-  font-size: .73rem;
-  letter-spacing: .06em;
+.project-button--active::before {
+  height: 28px;
 }
 
-.experiment-list {
-  border-top: 1px solid var(--ai-border);
+.project-index,
+.project-count {
+  color: var(--page-subtle);
+  font-size: .63rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .12em;
 }
 
-.experiment-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr) auto;
-  min-height: 245px;
-  padding: 2rem 0;
-  border-bottom: 1px solid var(--ai-border);
-  transition: background-color 220ms ease, box-shadow 220ms ease;
+.project-index {
+  padding-left: .75rem;
 }
 
-.experiment-card:hover {
-  background: var(--ai-surface);
-  box-shadow: inset 3px 0 var(--ai-accent);
+.project-name {
+  font-size: 1rem;
+  font-weight: 680;
 }
 
-.experiment-index,
-.experiment-content > p:first-child,
-.experiment-status {
-  color: var(--ai-subtle);
-  font-size: .65rem;
-  font-weight: 700;
-  letter-spacing: .13em;
+.example-panel {
+  min-width: 0;
+  padding: 2rem clamp(1.5rem, 4vw, 4rem) 2.75rem;
 }
 
-.experiment-content {
-  max-width: 39rem;
+.example-heading {
+  display: flex;
+  min-height: 76px;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
-.experiment-content > p:first-child {
-  margin: 0 0 1.1rem;
-  color: var(--ai-accent-secondary);
-}
-
-.experiment-content h3 {
-  margin: 0;
-  font-size: clamp(2rem, 4.3vw, 4rem);
-  font-weight: 540;
+.example-heading h2 {
+  margin: .55rem 0 0;
+  font-size: clamp(2rem, 4vw, 3.8rem);
+  font-weight: 580;
   letter-spacing: -.065em;
   line-height: 1;
 }
 
-.experiment-summary {
-  max-width: 34rem;
-  margin: 1.3rem 0 0;
-  color: var(--ai-muted);
-  font-size: .92rem;
-  line-height: 1.8;
+.example-heading > p {
+  margin: .1rem 0 0;
+  color: var(--page-muted);
+  font-size: .68rem;
+  letter-spacing: .08em;
+  text-align: right;
 }
 
-.experiment-status {
-  display: flex;
-  align-items: flex-start;
-  white-space: nowrap;
+.example-heading > p span {
+  display: block;
+  margin-bottom: .5rem;
+  color: var(--page-accent-secondary);
+  font-size: .62rem;
+  font-weight: 750;
+  letter-spacing: .14em;
 }
 
-.experiment-status i {
-  width: 6px;
-  height: 6px;
-  margin: .2rem .55rem 0 0;
-  border-radius: 50%;
-  background: var(--ai-accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ai-accent) 15%, transparent);
+.example-list {
+  margin: 1.75rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--page-border);
+  list-style: none;
 }
 
-.ai-footer {
+.example-item {
   display: grid;
-  grid-template-columns: 1fr 2fr auto;
+  min-height: 88px;
+  grid-template-columns: 3rem minmax(12rem, 1fr) minmax(10rem, .65fr) auto;
   align-items: center;
-  padding: 2rem max(1.5rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
-  border-top: 1px solid var(--ai-border);
-  background: var(--ai-surface);
-  color: var(--ai-subtle);
+  border-bottom: 1px solid var(--page-border);
+}
+
+.example-index,
+.example-item > p,
+.display-mark {
+  color: var(--page-subtle);
   font-size: .63rem;
+  font-weight: 700;
   letter-spacing: .12em;
 }
 
-.ai-footer p {
+.example-index {
+  font-variant-numeric: tabular-nums;
+}
+
+.example-item h3,
+.example-item > p {
   margin: 0;
 }
 
-.ai-footer p:nth-child(2) {
-  text-align: center;
+.example-item h3 {
+  font-size: clamp(1.15rem, 2vw, 1.7rem);
+  font-weight: 590;
+  letter-spacing: -.035em;
 }
 
-.ai-footer a {
-  min-height: 44px;
-  color: var(--ai-foreground);
-  font-weight: 700;
-  line-height: 44px;
-  text-decoration: none;
+.example-item > p {
+  color: var(--page-muted);
+}
+
+.display-mark {
+  padding: .4rem .55rem;
+  border: 1px solid var(--page-border);
+  color: var(--page-subtle);
 }
 
 @media (max-width: 900px) {
-  .hero {
-    min-height: 760px;
+  .three-stage {
+    opacity: .62;
+    mask-image: linear-gradient(to bottom, #000, transparent 78%);
   }
 
-  .hero-copy {
-    top: 46%;
+  .workspace-heading {
+    align-items: flex-start;
   }
 
-  .hero-aside {
-    display: none;
+  .project-total {
+    margin-top: 1.5rem;
   }
 
-  .catalogue {
+  .browser-layout {
     grid-template-columns: 1fr;
   }
 
-  .category-panel {
-    padding-right: 0;
+  .project-panel {
+    padding-bottom: 2rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--page-border-strong);
   }
 
-  .category-nav {
+  .project-nav {
     display: flex;
-    margin: 0 -.4rem 3rem;
+    margin: 1.5rem -.35rem 0;
     border-top: 0;
   }
 
-  .category-button {
-    min-height: 48px;
-    justify-content: center;
-    margin: 0 .4rem;
-    padding: 0 .9rem;
-    border: 1px solid var(--ai-border);
+  .project-button {
+    min-height: 56px;
+    grid-template-columns: 1fr auto;
+    margin: 0 .35rem;
+    padding: 0 .8rem;
+    border: 1px solid var(--page-border);
   }
 
-  .category-button small {
+  .project-button::before,
+  .project-index {
     display: none;
   }
 
-  .category-button:hover,
-  .category-button--active {
-    border-color: var(--ai-border-strong);
-    background: var(--ai-surface-raised);
-  }
-
-  .category-button--active::before {
-    left: .55rem;
-  }
-
-  .category-button--active span {
-    transform: none;
-  }
-
-  .category-note {
-    display: none;
+  .example-panel {
+    padding-top: 2.5rem;
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 620px) {
   .ai-header {
     min-height: 68px;
     padding-right: max(9.5rem, calc(env(safe-area-inset-right) + 9.5rem));
   }
 
-  .header-mark {
+  .header-mark,
+  .project-total {
     display: none;
   }
 
-  .hero {
-    min-height: 700px;
+  .workspace {
+    min-height: calc(100dvh - 68px);
+    padding-top: 2.75rem;
+    padding-right: 1.25rem;
+    padding-left: 1.25rem;
   }
 
-  .hero-grid {
-    background-size: 48px 48px;
-    mask-image: linear-gradient(to bottom, #000, transparent 80%);
-  }
-
-  .hero-copy {
-    top: 44%;
-    transform: translateY(-38%);
-  }
-
-  .hero h1 {
-    font-size: clamp(3.6rem, 20vw, 5.4rem);
-  }
-
-  .scroll-cue {
-    bottom: 2.5rem;
-  }
-
-  .catalogue {
-    padding-top: 4.5rem;
-    padding-bottom: 5rem;
-  }
-
-  .category-panel h2 {
-    margin-bottom: 2rem;
-  }
-
-  .category-nav {
+  .workspace-heading {
     margin-bottom: 2.5rem;
   }
 
-  .category-button {
-    margin: 0 .25rem;
-    padding-right: .55rem;
-    padding-left: .55rem;
-    font-size: .88rem;
+  .workspace-heading h1 {
+    font-size: clamp(3rem, 14vw, 4.2rem);
   }
 
-  .category-button:hover,
-  .category-button--active {
-    background: var(--ai-surface-raised);
+  .project-panel,
+  .example-panel {
+    padding-right: 1rem;
+    padding-left: 1rem;
   }
 
-  .experiment-card {
-    grid-template-columns: 2.25rem minmax(0, 1fr);
-    min-height: 0;
-    padding: 2rem 0 2.5rem;
+  .project-button {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    margin: 0 .2rem;
+    padding: 0 .35rem;
   }
 
-  .experiment-card:hover {
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .experiment-content h3 {
-    font-size: 2.35rem;
-  }
-
-  .experiment-status {
-    grid-column: 2;
-    margin-top: 1.5rem;
-  }
-
-  .ai-footer {
-    grid-template-columns: 1fr auto;
-  }
-
-  .ai-footer p:nth-child(2) {
+  .project-count {
     display: none;
+  }
+
+  .example-heading {
+    min-height: 68px;
+  }
+
+  .example-heading > p {
+    display: none;
+  }
+
+  .example-list {
+    margin-top: 1.25rem;
+  }
+
+  .example-item {
+    min-height: 96px;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  }
+
+  .example-item h3 {
+    font-size: 1.2rem;
+  }
+
+  .example-item > p {
+    grid-column: 2;
+    margin-top: -1.6rem;
+    padding-right: .75rem;
+    font-size: .58rem;
+  }
+
+  .display-mark {
+    grid-row: 1 / span 2;
+    grid-column: 3;
+    padding: .35rem .4rem;
+    font-size: .55rem;
   }
 }
 
@@ -884,8 +867,6 @@ onBeforeUnmount(() => {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
 }
