@@ -294,7 +294,7 @@ onBeforeUnmount(disposeScene);
 </script>
 
 <template>
-  <main ref="pageElement" class="ai-page" tabindex="-1">
+  <main ref="pageElement" class="ai-page" data-ai-3d-theme-root tabindex="-1">
     <a class="skip-link" href="#project-browser">跳至项目与例子列表</a>
     <canvas ref="canvasElement" class="three-stage" aria-hidden="true"></canvas>
     <div class="background-grid" aria-hidden="true"></div>
@@ -361,6 +361,29 @@ onBeforeUnmount(disposeScene);
   </main>
 </template>
 
+<style>
+/* 跨越异步路由包的 scoped 边界，确保根主题变化能覆盖 AI-3D 页语义色。 */
+html[data-theme='light'] [data-ai-3d-theme-root] {
+  --page-background: #f1f0ec;
+  --page-surface: rgb(250 249 246 / 30%);
+  --page-surface-active: rgb(255 255 255 / 96%);
+  --page-foreground: #20232a;
+  --page-muted: #565d69;
+  --page-subtle: #707681;
+  --page-border: rgb(32 35 42 / 18%);
+  --page-border-strong: rgb(32 35 42 / 32%);
+  --page-accent: #6450c4;
+  --page-accent-secondary: #087c70;
+  --page-focus: #533eae;
+  --three-wire: #6652c7;
+  --three-ring: #0e8a7c;
+  --three-point: #765fd1;
+  background:
+    radial-gradient(circle at 76% 36%, rgb(101 79 193 / 13%), transparent 31rem),
+    var(--page-background);
+}
+</style>
+
 <style scoped>
 :global(*) {
   box-sizing: border-box;
@@ -396,26 +419,6 @@ onBeforeUnmount(disposeScene);
   outline: none;
   isolation: isolate;
   transition: background-color 220ms ease, color 220ms ease;
-}
-
-:global(html[data-theme='light']) .ai-page {
-  --page-background: #f1f0ec;
-  --page-surface: rgb(250 249 246 / 30%);
-  --page-surface-active: rgb(255 255 255 / 96%);
-  --page-foreground: #20232a;
-  --page-muted: #565d69;
-  --page-subtle: #707681;
-  --page-border: rgb(32 35 42 / 18%);
-  --page-border-strong: rgb(32 35 42 / 32%);
-  --page-accent: #6450c4;
-  --page-accent-secondary: #087c70;
-  --page-focus: #533eae;
-  --three-wire: #6652c7;
-  --three-ring: #0e8a7c;
-  --three-point: #765fd1;
-  background:
-    radial-gradient(circle at 76% 36%, rgb(101 79 193 / 13%), transparent 31rem),
-    var(--page-background);
 }
 
 .three-stage,
