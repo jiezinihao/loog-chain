@@ -583,7 +583,7 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
   border-top: 1px solid var(--page-border-strong);
   border-bottom: 1px solid var(--page-border-strong);
   background: var(--page-surface);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(4px);
 }
 
 .project-panel {

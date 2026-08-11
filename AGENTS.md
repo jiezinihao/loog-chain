@@ -28,6 +28,22 @@
 - 页面样式优先使用语义化颜色变量，并根据根节点的 `data-theme` 映射两套独立色板；禁止通过 `brightness()` 等整体滤镜模拟另一套主题。
 - 两套主题需分别保证正文、辅助文字和交互状态具有足够对比度，不能仅验证其中一种主题。
 
+### 异步业务包的主题应用
+
+- 主题状态统一来自 `apps/entry/src/composables/useTheme.ts` 写入的 `html[data-theme]`，业务包不得维护第二份主题状态。
+- 异步加载的业务包中，在 `<style scoped>` 内使用祖先主题选择器可能无法稳定覆盖默认 Dark 变量。页面根节点必须增加模块专用标记，例如 `data-ai-3d-theme-root`。
+- Light 色板映射应放在独立的非 scoped `<style>` 中，使用完整全局选择器；scoped 样式只保留默认色板和组件布局：
+
+```css
+html[data-theme='light'] [data-ai-3d-theme-root] {
+  --page-background: #f1f0ec;
+  --page-foreground: #20232a;
+}
+```
+
+- Three.js、Canvas、ECharts 等命令式渲染不会自动读取更新后的 CSS 变量。需要监听 `html` 的 `data-theme` 变化，从页面主题根节点重新读取语义变量并更新材质或画布，同时在卸载时清理监听器。
+- 主题相关修改至少检查首次进入页面、Dark 切换 Light、Light 切换 Dark 三种场景，确认页面样式与命令式渲染内容同步变化。
+
 ## 验证
 
 - 安装或依赖变动后，运行 `pnpm install` 更新 `pnpm-lock.yaml`。
