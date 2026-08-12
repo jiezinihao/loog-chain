@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import * as THREE from 'three';
 
+import AsyncGameLoading from './components/AsyncGameLoading.vue';
+
 type ProjectId = 'three' | 'cesium' | 'game';
+type GameId = 'rubiks-cube' | 'snake' | 'platform-jump' | 'top-down-racing';
 
 interface ProjectExample {
   id: string;
@@ -48,20 +51,49 @@ const projects: ProjectDefinition[] = [
     name: 'Game',
     code: 'PLAYABLE IDEAS',
     examples: [
-      { id: 'rubiks-cube', name: '还原魔方', stack: 'THREE.JS / PHASER' },
-      { id: 'snake', name: '贪吃蛇', stack: 'PHASER' },
-      { id: 'platform-jump', name: '像素平台跳跃', stack: 'PHASER / RAPIER' },
-      { id: 'space-shooter', name: '太空射击', stack: 'THREE.JS / PHASER' },
+      { id: 'rubiks-cube', name: '还原魔方', stack: 'THREE.JS / PUZZLE' },
+      { id: 'snake', name: '贪吃蛇', stack: 'CANVAS 2D' },
+      { id: 'platform-jump', name: '像素平台跳跃', stack: 'CANVAS 2D / PHYSICS' },
+      { id: 'top-down-racing', name: '高空俯视赛车', stack: 'THREE.JS / TIME TRIAL' },
     ],
   },
 ];
 
+// 每个游戏建立独立分包，只有用户进入对应工作台时才请求和初始化。
+const gameComponents = {
+  'rubiks-cube': defineAsyncComponent({
+    loader: () => import('./games/RubiksCubeGame.vue'),
+    loadingComponent: AsyncGameLoading,
+    delay: 120,
+  }),
+  snake: defineAsyncComponent({
+    loader: () => import('./games/SnakeGame.vue'),
+    loadingComponent: AsyncGameLoading,
+    delay: 120,
+  }),
+  'platform-jump': defineAsyncComponent({
+    loader: () => import('./games/PlatformJumpGame.vue'),
+    loadingComponent: AsyncGameLoading,
+    delay: 120,
+  }),
+  'top-down-racing': defineAsyncComponent({
+    loader: () => import('./games/TopDownRacingGame.vue'),
+    loadingComponent: AsyncGameLoading,
+    delay: 120,
+  }),
+} satisfies Record<GameId, ReturnType<typeof defineAsyncComponent>>;
+
 const activeProjectId = ref<ProjectId>('three');
+const activeGameId = ref<GameId>();
 const pageElement = ref<HTMLElement>();
 const canvasElement = ref<HTMLCanvasElement>();
+const gameCloseButton = ref<HTMLButtonElement>();
 const activeProject = computed(
   () => projects.find((project) => project.id === activeProjectId.value) ?? projects[0],
 );
+const gameProject = projects.find((project) => project.id === 'game');
+const activeGame = computed(() => gameProject?.examples.find((example) => example.id === activeGameId.value));
+const activeGameComponent = computed(() => activeGameId.value ? gameComponents[activeGameId.value] : undefined);
 
 let renderer: THREE.WebGLRenderer | undefined;
 let camera: THREE.PerspectiveCamera | undefined;
@@ -79,11 +111,34 @@ let motionDeadline = 0;
 let pointerX = 0;
 let pointerY = 0;
 let reducedMotion = false;
+let previousBodyOverflow = '';
+let gameTriggerElement: HTMLElement | undefined;
 const geometries: THREE.BufferGeometry[] = [];
 const materials: THREE.Material[] = [];
 
 function selectProject(projectId: ProjectId) {
   activeProjectId.value = projectId;
+}
+
+async function openGame(gameId: string, event: MouseEvent) {
+  if (!(gameId in gameComponents)) return;
+  gameTriggerElement = event.currentTarget as HTMLElement;
+  activeGameId.value = gameId as GameId;
+  previousBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  await nextTick();
+  gameCloseButton.value?.focus();
+}
+
+async function closeGame() {
+  activeGameId.value = undefined;
+  document.body.style.overflow = previousBodyOverflow;
+  await nextTick();
+  gameTriggerElement?.focus();
+}
+
+function handlePageKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && activeGameId.value) void closeGame();
 }
 
 function createParticleGeometry() {
@@ -276,10 +331,17 @@ function disposeScene() {
   pointMaterial = undefined;
 }
 
+function disposePage() {
+  disposeScene();
+  document.body.style.overflow = previousBodyOverflow;
+  window.removeEventListener('keydown', handlePageKeydown);
+}
+
 onMounted(async () => {
   await nextTick();
   pageElement.value?.focus();
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.addEventListener('keydown', handlePageKeydown);
 
   try {
     initializeScene();
@@ -290,7 +352,7 @@ onMounted(async () => {
   }
 });
 
-onBeforeUnmount(disposeScene);
+onBeforeUnmount(disposePage);
 </script>
 
 <template>
@@ -349,15 +411,60 @@ onBeforeUnmount(disposeScene);
 
           <ol class="example-list" aria-live="polite">
             <li v-for="(example, index) in activeProject.examples" :key="example.id" class="example-item">
-              <span class="example-index">{{ String(index + 1).padStart(2, '0') }}</span>
-              <h3>{{ example.name }}</h3>
-              <p>{{ example.stack }}</p>
-              <span class="display-mark">仅展示</span>
+              <button
+                v-if="activeProject.id === 'game'"
+                class="example-entry example-entry--playable"
+                type="button"
+                :aria-label="`进入${example.name}游戏`"
+                @click="openGame(example.id, $event)"
+              >
+                <span class="example-index">{{ String(index + 1).padStart(2, '0') }}</span>
+                <span class="example-name">{{ example.name }}</span>
+                <span class="example-stack">{{ example.stack }}</span>
+                <span class="display-mark">
+                  进入
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </span>
+              </button>
+              <div v-else class="example-entry">
+                <span class="example-index">{{ String(index + 1).padStart(2, '0') }}</span>
+                <span class="example-name">{{ example.name }}</span>
+                <span class="example-stack">{{ example.stack }}</span>
+                <span class="display-mark">仅展示</span>
+              </div>
             </li>
           </ol>
         </section>
       </div>
     </section>
+
+    <Transition name="game-workspace">
+      <section
+        v-if="activeGameId && activeGameComponent"
+        class="game-workspace"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="game-workspace-title"
+      >
+        <header class="game-workspace__bar">
+          <div>
+            <span>PLAYABLE EXAMPLE</span>
+            <strong id="game-workspace-title">{{ activeGame?.name }}</strong>
+          </div>
+          <button ref="gameCloseButton" type="button" aria-label="关闭游戏并返回例子列表" @click="closeGame">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            <span>返回列表</span>
+          </button>
+        </header>
+        <div class="game-workspace__content">
+          <component :is="activeGameComponent" />
+        </div>
+      </section>
+    </Transition>
   </main>
 </template>
 
@@ -378,6 +485,34 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
   --three-wire: #6652c7;
   --three-ring: #0e8a7c;
   --three-point: #765fd1;
+  --game-background: #f1f0ec;
+  --game-surface: rgb(255 255 255 / 72%);
+  --game-foreground: #20232a;
+  --game-muted: #565d69;
+  --game-border: rgb(32 35 42 / 18%);
+  --game-border-strong: rgb(32 35 42 / 34%);
+  --game-accent: #6450c4;
+  --game-on-accent: #fff;
+  --game-accent-secondary: #087c70;
+  --game-focus: #533eae;
+  --game-control: #f8f7f3;
+  --game-control-hover: #e8e3f6;
+  --game-canvas: #e8e6e1;
+  --game-canvas-grid: rgb(32 35 42 / 9%);
+  --game-grid: rgb(32 35 42 / 8%);
+  --game-stage-glow: rgb(100 80 196 / 15%);
+  --game-shadow: rgb(45 39 63 / 15%);
+  --game-loading-cell: rgb(100 80 196 / 14%);
+  --game-danger: #b42318;
+  --game-danger-soft: rgb(180 35 24 / 12%);
+  --racing-sky: #dbe8ed;
+  --racing-fog: #dbe8ed;
+  --racing-ambient: #f8fbfc;
+  --racing-key-light: #fff4dc;
+  --racing-hud: rgb(250 249 246 / 92%);
+  --racing-hud-strong: rgb(255 255 255 / 98%);
+  --racing-scrim: rgb(20 24 30 / 48%);
+  --cube-edge: #272a31;
   background:
     radial-gradient(circle at 76% 36%, rgb(101 79 193 / 13%), transparent 31rem),
     var(--page-background);
@@ -408,6 +543,34 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
   --three-wire: #9485ff;
   --three-ring: #62e5d1;
   --three-point: #d4ceff;
+  --game-background: #080a0f;
+  --game-surface: rgb(19 23 34 / 82%);
+  --game-foreground: #f4f5f8;
+  --game-muted: #a5abb7;
+  --game-border: rgb(255 255 255 / 14%);
+  --game-border-strong: rgb(255 255 255 / 28%);
+  --game-accent: #9f91ff;
+  --game-on-accent: #090b10;
+  --game-accent-secondary: #68e5d1;
+  --game-focus: #68e5d1;
+  --game-control: #111620;
+  --game-control-hover: #20263a;
+  --game-canvas: #0c1018;
+  --game-canvas-grid: rgb(255 255 255 / 7%);
+  --game-grid: rgb(255 255 255 / 6%);
+  --game-stage-glow: rgb(104 81 228 / 18%);
+  --game-shadow: rgb(0 0 0 / 42%);
+  --game-loading-cell: rgb(159 145 255 / 18%);
+  --game-danger: #ff8686;
+  --game-danger-soft: rgb(255 104 104 / 15%);
+  --racing-sky: #101923;
+  --racing-fog: #101923;
+  --racing-ambient: #9fb3c7;
+  --racing-key-light: #ffe2b2;
+  --racing-hud: rgb(10 15 22 / 88%);
+  --racing-hud-strong: rgb(14 20 29 / 96%);
+  --racing-scrim: rgb(3 6 10 / 58%);
+  --cube-edge: #080a0f;
   position: relative;
   min-width: 320px;
   min-height: 100dvh;
@@ -697,15 +860,42 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
 }
 
 .example-item {
-  display: grid;
-  min-height: 88px;
-  grid-template-columns: 3rem minmax(12rem, 1fr) minmax(10rem, .65fr) auto;
-  align-items: center;
   border-bottom: 1px solid var(--page-border);
 }
 
+.example-entry {
+  display: grid;
+  width: 100%;
+  min-height: 88px;
+  grid-template-columns: 3rem minmax(12rem, 1fr) minmax(10rem, .65fr) auto;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.example-entry--playable {
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 180ms ease, padding 220ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.example-entry--playable:hover {
+  padding-right: .75rem;
+  padding-left: .75rem;
+  background: var(--page-surface-active);
+}
+
+.example-entry--playable:focus-visible {
+  outline: 2px solid var(--page-focus);
+  outline-offset: -2px;
+}
+
 .example-index,
-.example-item > p,
+.example-stack,
 .display-mark {
   color: var(--page-subtle);
   font-size: .63rem;
@@ -717,25 +907,136 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
   font-variant-numeric: tabular-nums;
 }
 
-.example-item h3,
-.example-item > p {
-  margin: 0;
-}
-
-.example-item h3 {
+.example-name {
   font-size: clamp(1.15rem, 2vw, 1.7rem);
   font-weight: 590;
   letter-spacing: -.035em;
 }
 
-.example-item > p {
+.example-stack {
   color: var(--page-muted);
 }
 
 .display-mark {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
   padding: .4rem .55rem;
   border: 1px solid var(--page-border);
   color: var(--page-subtle);
+}
+
+.display-mark svg {
+  width: 14px;
+  margin-left: .35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.example-entry--playable:hover .display-mark {
+  border-color: var(--page-accent-secondary);
+  color: var(--page-accent-secondary);
+}
+
+.game-workspace {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  min-width: 320px;
+  flex-direction: column;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 72% 20%, var(--game-stage-glow), transparent 34rem),
+    var(--game-background);
+  color: var(--game-foreground);
+  inset: 0;
+}
+
+.game-workspace__bar {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  min-height: 72px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(1rem, env(safe-area-inset-top)) max(10.5rem, calc(env(safe-area-inset-right) + 10.5rem)) 1rem max(1.25rem, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--game-border);
+  background: var(--game-background);
+}
+
+.game-workspace__bar > div {
+  display: flex;
+  align-items: baseline;
+}
+
+.game-workspace__bar > div span {
+  margin-right: .8rem;
+  color: var(--game-accent-secondary);
+  font-size: .6rem;
+  font-weight: 750;
+  letter-spacing: .18em;
+}
+
+.game-workspace__bar strong {
+  font-size: .86rem;
+  font-weight: 650;
+}
+
+.game-workspace__bar button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 .8rem;
+  border: 1px solid var(--game-border-strong);
+  background: var(--game-control);
+  color: var(--game-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 700;
+  touch-action: manipulation;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.game-workspace__bar button:hover {
+  border-color: var(--game-accent-secondary);
+  background: var(--game-control-hover);
+}
+
+.game-workspace__bar button:focus-visible {
+  outline: 2px solid var(--game-focus);
+  outline-offset: 2px;
+}
+
+.game-workspace__bar button svg {
+  width: 16px;
+  margin-right: .55rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.game-workspace__content {
+  width: min(100%, 1600px);
+  flex: 1;
+  align-self: center;
+}
+
+.game-workspace-enter-active,
+.game-workspace-leave-active {
+  transition: opacity 240ms ease, transform 320ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.game-workspace-enter-from,
+.game-workspace-leave-to {
+  opacity: 0;
+  transform: translateY(1.5rem);
 }
 
 @media (max-width: 900px) {
@@ -841,16 +1142,16 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
     margin-top: 1.25rem;
   }
 
-  .example-item {
+  .example-entry {
     min-height: 96px;
     grid-template-columns: 2.25rem minmax(0, 1fr) auto;
   }
 
-  .example-item h3 {
+  .example-name {
     font-size: 1.2rem;
   }
 
-  .example-item > p {
+  .example-stack {
     grid-column: 2;
     margin-top: -1.6rem;
     padding-right: .75rem;
@@ -863,6 +1164,31 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
     padding: .35rem .4rem;
     font-size: .55rem;
   }
+
+  .example-entry--playable:hover {
+    padding-right: .35rem;
+    padding-left: .35rem;
+  }
+
+  .game-workspace__bar {
+    min-height: 68px;
+    padding-right: max(9.5rem, calc(env(safe-area-inset-right) + 9.5rem));
+  }
+
+  .game-workspace__bar > div span,
+  .game-workspace__bar button span {
+    display: none;
+  }
+
+  .game-workspace__bar button {
+    width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .game-workspace__bar button svg {
+    margin-right: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -871,6 +1197,11 @@ html[data-theme='light'] [data-ai-3d-theme-root] {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
+  }
+
+  .game-workspace-enter-active,
+  .game-workspace-leave-active {
+    transition: none;
   }
 }
 </style>
